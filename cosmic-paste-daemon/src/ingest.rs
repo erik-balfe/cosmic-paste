@@ -3,6 +3,7 @@ use cosmic_paste_core::IngestOutcome;
 use tokio::sync::mpsc;
 
 use crate::monitor::ClipboardEvent;
+use crate::signals::DaemonSignal;
 
 fn unix_now() -> u64 {
     std::time::SystemTime::now()
@@ -15,6 +16,7 @@ fn unix_now() -> u64 {
 pub async fn run_ingest_loop(
     mut rx: mpsc::Receiver<ClipboardEvent>,
     state: SharedDaemonState,
+    signal_tx: Option<mpsc::Sender<DaemonSignal>>,
 ) {
     while let Some(event) = rx.recv().await {
         if event.mime_type != "text/plain" {
@@ -47,14 +49,36 @@ pub async fn run_ingest_loop(
 
         if let Err(err) = guard.persist() {
             tracing::error!("failed to persist clipboard ingest: {err}");
-        } else {
-            tracing::debug!(
-                bytes = event.payload.len(),
-                source = ?event.source,
-                observed_at = event.observed_at,
-                "ingested clipboard text"
-            );
+            continue;
         }
+
+        let uuid = guard
+            .history()
+            .get(0)
+            .map(|item| item.uuid.to_string())
+            .unwrap_or_default();
+        let count = guard.history().len() as u32;
+        drop(guard);
+
+        if let Some(tx) = &signal_tx {
+            let _ = tx
+                .send(DaemonSignal::Update {
+                    action: "add",
+                    target: uuid,
+                    index: 0,
+                })
+                .await;
+            let _ = tx
+                .send(DaemonSignal::ActiveIndexChanged { index: 0, count })
+                .await;
+        }
+
+        tracing::debug!(
+            bytes = event.payload.len(),
+            source = ?event.source,
+            observed_at = event.observed_at,
+            "ingested clipboard text"
+        );
     }
 }
 
@@ -72,7 +96,7 @@ mod tests {
             .shared_state();
         let (tx, rx) = mpsc::channel(4);
 
-        let ingest = tokio::spawn(run_ingest_loop(rx, state.clone()));
+        let ingest = tokio::spawn(run_ingest_loop(rx, state.clone(), None));
 
         tx.send(ClipboardEvent {
             source: SelectionSource::Clipboard,
@@ -101,7 +125,7 @@ mod tests {
             .shared_state();
         let (tx, rx) = mpsc::channel(4);
 
-        let ingest = tokio::spawn(run_ingest_loop(rx, state.clone()));
+        let ingest = tokio::spawn(run_ingest_loop(rx, state.clone(), None));
 
         tx.send(ClipboardEvent {
             source: SelectionSource::Clipboard,

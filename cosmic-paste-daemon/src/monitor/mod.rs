@@ -3,11 +3,13 @@
 mod data_control;
 mod guard;
 
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+pub use cosmic_paste_core::dbus::ClipboardWriteRequest;
 pub use guard::SelfCopyGuard;
-use tokio::sync::mpsc;
+use tokio::sync::mpsc as async_mpsc;
 
 /// Which Wayland selection produced the payload.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -54,19 +56,18 @@ impl ClipboardMonitor {
         }
     }
 
-    #[allow(dead_code)] // Select write-back arms the guard (upcoming PR)
-    pub fn guard(&self) -> Arc<Mutex<SelfCopyGuard>> {
-        self.guard.clone()
-    }
-
     /// Spawn the monitor thread and return the receiver for ingest.
-    pub fn spawn(self, tx: mpsc::Sender<ClipboardEvent>) -> MonitorHandle {
+    pub fn spawn(
+        self,
+        tx: async_mpsc::Sender<ClipboardEvent>,
+        write_rx: mpsc::Receiver<ClipboardWriteRequest>,
+    ) -> MonitorHandle {
         let guard = self.guard.clone();
         let config = self.config;
         let join = std::thread::Builder::new()
             .name("cosmic-paste-wayland".into())
             .spawn(move || {
-                if let Err(err) = data_control::run(tx, config, guard) {
+                if let Err(err) = data_control::run(tx, write_rx, config, guard) {
                     tracing::error!("clipboard monitor exited: {err}");
                 }
             })

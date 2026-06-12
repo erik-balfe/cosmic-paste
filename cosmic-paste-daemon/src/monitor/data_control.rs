@@ -1,13 +1,15 @@
 //! wlr-data-control clipboard monitor (ADR-001).
 
 use std::collections::{HashMap, HashSet};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::os::fd::AsFd;
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use cosmic_paste_core::dbus::ClipboardWriteRequest;
 use cosmic_paste_core::item::text_checksum;
-use tokio::sync::mpsc;
+use tokio::sync::mpsc as async_mpsc;
 use wayland_client::globals::{registry_queue_init, GlobalListContents};
 use wayland_client::protocol::{wl_registry::WlRegistry, wl_seat::WlSeat};
 use wayland_client::{
@@ -17,6 +19,7 @@ use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_device_v1::{self, ZwlrDataControlDeviceV1},
     zwlr_data_control_manager_v1::ZwlrDataControlManagerV1,
     zwlr_data_control_offer_v1::{self, ZwlrDataControlOfferV1},
+    zwlr_data_control_source_v1::{self, ZwlrDataControlSourceV1},
 };
 
 use super::{ClipboardEvent, MonitorConfig, SelectionSource, SelfCopyGuard};
@@ -46,17 +49,26 @@ struct PendingSelection {
     changed_at: Instant,
 }
 
+struct SourcePayload {
+    data: Vec<u8>,
+    reply: Option<std::sync::mpsc::SyncSender<Result<(), String>>>,
+}
+
 struct State {
+    manager: ZwlrDataControlManagerV1,
     seats: Vec<(WlSeat, SeatData)>,
     offers: HashMap<ZwlrDataControlOfferV1, HashSet<String>>,
+    sources: HashMap<ZwlrDataControlSourceV1, SourcePayload>,
     pending: Option<PendingSelection>,
     config: MonitorConfig,
     guard: Arc<Mutex<SelfCopyGuard>>,
-    tx: mpsc::Sender<ClipboardEvent>,
+    tx: async_mpsc::Sender<ClipboardEvent>,
+    write_rx: mpsc::Receiver<ClipboardWriteRequest>,
 }
 
 pub fn run(
-    tx: mpsc::Sender<ClipboardEvent>,
+    tx: async_mpsc::Sender<ClipboardEvent>,
+    write_rx: mpsc::Receiver<ClipboardWriteRequest>,
     config: MonitorConfig,
     guard: Arc<Mutex<SelfCopyGuard>>,
 ) -> Result<(), MonitorError> {
@@ -101,17 +113,21 @@ pub fn run(
     }
 
     let mut state = State {
+        manager: manager.clone(),
         seats,
         offers: HashMap::new(),
+        sources: HashMap::new(),
         pending: None,
         config,
         guard,
         tx,
+        write_rx,
     };
 
     tracing::info!("wlr-data-control clipboard monitor connected");
 
     loop {
+        state.process_write_requests(&qh)?;
         queue.blocking_dispatch(&mut state)?;
         if let Err(err) = state.flush_pending(&mut queue) {
             tracing::info!("stopping clipboard monitor: {err}");
@@ -155,6 +171,56 @@ impl SeatData {
 }
 
 impl State {
+    fn process_write_requests(&mut self, qh: &QueueHandle<Self>) -> Result<(), MonitorError> {
+        while let Ok(request) = self.write_rx.try_recv() {
+            self.guard
+                .lock()
+                .expect("self-copy guard lock")
+                .arm(request.fingerprint);
+
+            let source = self.manager.create_data_source(qh, ());
+            source.offer("text/plain".to_string());
+            self.sources.insert(
+                source.clone(),
+                SourcePayload {
+                    data: request.text.into_bytes(),
+                    reply: Some(request.reply),
+                },
+            );
+
+            let Some((_, seat_data)) = self.seats.first() else {
+                self.fail_source(&source, "no Wayland seat available");
+                continue;
+            };
+            let Some(device) = seat_data.device.as_ref() else {
+                self.fail_source(&source, "data-control device unavailable");
+                continue;
+            };
+
+            device.set_selection(Some(&source));
+            tracing::debug!(bytes = self.sources[&source].data.len(), "posted clipboard write");
+        }
+        Ok(())
+    }
+
+    fn fail_source(&mut self, source: &ZwlrDataControlSourceV1, message: &str) {
+        if let Some(payload) = self.sources.remove(source)
+            && let Some(reply) = payload.reply
+        {
+            let _ = reply.send(Err(message.to_owned()));
+        }
+        source.destroy();
+    }
+
+    fn complete_source(&mut self, source: &ZwlrDataControlSourceV1, result: Result<(), String>) {
+        if let Some(payload) = self.sources.remove(source)
+            && let Some(reply) = payload.reply
+        {
+            let _ = reply.send(result);
+        }
+        source.destroy();
+    }
+
     fn schedule_selection(&mut self, source: SelectionSource, offer: ZwlrDataControlOfferV1) {
         self.pending = Some(PendingSelection {
             source,
@@ -355,6 +421,47 @@ impl Dispatch<ZwlrDataControlOfferV1, ()> for State {
             && let Some(types) = state.offers.get_mut(offer)
         {
             types.insert(mime_type);
+        }
+    }
+}
+
+impl Dispatch<ZwlrDataControlSourceV1, ()> for State {
+    fn event(
+        state: &mut Self,
+        source: &ZwlrDataControlSourceV1,
+        event: <ZwlrDataControlSourceV1 as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+    ) {
+        match event {
+            zwlr_data_control_source_v1::Event::Send { mime_type, fd } => {
+                if mime_type != "text/plain" {
+                    state.complete_source(
+                        source,
+                        Err(format!("unexpected clipboard mime type: {mime_type}")),
+                    );
+                    return;
+                }
+
+                let Some(data) = state.sources.get(source).map(|payload| payload.data.clone()) else {
+                    return;
+                };
+
+                let result = (|| {
+                    let mut file = std::fs::File::from(fd);
+                    file.write_all(&data)?;
+                    file.flush()?;
+                    Ok(())
+                })()
+                .map_err(|err: std::io::Error| err.to_string());
+
+                state.complete_source(source, result);
+            }
+            zwlr_data_control_source_v1::Event::Cancelled => {
+                state.complete_source(source, Err("clipboard transfer cancelled".into()));
+            }
+            _ => {}
         }
     }
 }

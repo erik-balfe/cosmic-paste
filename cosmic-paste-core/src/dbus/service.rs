@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use zbus::interface;
 use zbus::object_server::SignalEmitter;
 
+use super::clipboard::write_clipboard;
 use super::lifecycle::{LifecycleHandle, ShutdownReason};
 use super::state::SharedDaemonState;
 use super::{element_value, item_kind_name, parse_uuid, VERSION};
@@ -145,22 +148,24 @@ impl CosmicPasteService {
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         offset: i32,
     ) -> zbus::fdo::Result<String> {
-        let (uuid, index, count) = self
+        let (uuid, text, index, count) = self
             .with_state(|state| {
-                let (index, uuid, history_len) = {
-                    let (index, item) = state
-                        .session_mut()
-                        .select_at_offset(offset)
-                        .map_err(map_error)?;
-                    (index, item.uuid.to_string(), state.history().len())
-                };
+                let (index, item) = state
+                    .session_mut()
+                    .select_at_offset(offset)
+                    .map_err(map_error)?;
+                let uuid = item.uuid.to_string();
+                let text = element_value(item);
+                let history_len = state.history().len();
                 state.persist().map_err(|e| {
                     zbus::fdo::Error::Failed(format!("failed to persist session state: {e}"))
                 })?;
-                Ok((uuid, index as u32, history_len as u32))
+                Ok((uuid, text, index as u32, history_len as u32))
             })
             .await?;
 
+        self.write_clipboard_text(&text).await?;
+        Self::update(emitter.clone(), "select", &uuid, index).await?;
         Self::emit_active_index_changed(emitter, index, count).await?;
         Ok(uuid)
     }
@@ -357,8 +362,33 @@ impl CosmicPasteService {
         Err(not_supported("Search"))
     }
 
-    async fn select(&self, _uuid: &str) -> zbus::fdo::Result<()> {
-        Err(not_supported("Select"))
+    async fn select(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        uuid: &str,
+    ) -> zbus::fdo::Result<()> {
+        let parsed = parse_uuid(uuid)?;
+        let (target, text, index, count) = self
+            .with_state(|state| {
+                let index = state.session_mut().select(parsed).map_err(map_error)?;
+                let item = state
+                    .history()
+                    .get(index)
+                    .ok_or_else(|| zbus::fdo::Error::Failed("failed to read selected item".into()))?;
+                let target = item.uuid.to_string();
+                let text = element_value(item);
+                let count = state.history().len() as u32;
+                state.persist().map_err(|e| {
+                    zbus::fdo::Error::Failed(format!("failed to persist select: {e}"))
+                })?;
+                Ok((target, text, index as u32, count))
+            })
+            .await?;
+
+        self.write_clipboard_text(&text).await?;
+        Self::update(emitter.clone(), "select", &target, index).await?;
+        Self::emit_active_index_changed(emitter, index, count).await?;
+        Ok(())
     }
 
     async fn set_password(&self, _uuid: &str, _name: &str) -> zbus::fdo::Result<()> {
@@ -443,6 +473,32 @@ impl CosmicPasteService {
 }
 
 impl CosmicPasteService {
+    pub async fn emit_history_update(
+        emitter: SignalEmitter<'_>,
+        action: &str,
+        target: &str,
+        index: u32,
+    ) -> zbus::Result<()> {
+        Self::update(emitter, action, target, index).await
+    }
+
+    pub async fn emit_active_index(
+        emitter: SignalEmitter<'_>,
+        index: u32,
+        count: u32,
+    ) -> zbus::Result<()> {
+        Self::emit_active_index_changed(emitter, index, count).await
+    }
+
+    async fn write_clipboard_text(&self, text: &str) -> zbus::fdo::Result<()> {
+        let tx = self.state.lock().await.clipboard_writer().map(Arc::clone);
+        let Some(tx) = tx else {
+            tracing::debug!("clipboard writer not configured; skipping write-back");
+            return Ok(());
+        };
+        write_clipboard(&tx, text).await
+    }
+
     async fn read_active_index(&self) -> zbus::fdo::Result<u32> {
         Ok(self
             .state

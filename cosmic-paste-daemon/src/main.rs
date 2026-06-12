@@ -1,6 +1,7 @@
 mod ingest;
 mod lifecycle;
 mod monitor;
+mod signals;
 
 use cosmic_paste_core::dbus::lifecycle::ShutdownReason;
 use cosmic_paste_core::dbus::state::DaemonState;
@@ -13,7 +14,7 @@ use tracing::{error, info};
 async fn main() {
     init_logging();
 
-    let daemon = match DaemonState::load_default() {
+    let mut daemon = match DaemonState::load_default() {
         Ok(state) => state,
         Err(err) => {
             error!("failed to load daemon state, starting in-memory: {err}");
@@ -21,14 +22,22 @@ async fn main() {
         }
     };
 
+    let (clipboard_write_tx, clipboard_write_rx) = std::sync::mpsc::channel();
+    daemon.set_clipboard_writer(clipboard_write_tx);
+
     let (lifecycle, lifecycle_rx) = LifecycleHandle::pair();
     let service = daemon.service(lifecycle);
     let shared = service.shared_state();
 
     let (clipboard_tx, clipboard_rx) = mpsc::channel(64);
+    let (signal_tx, signal_rx) = mpsc::channel(64);
     let monitor = monitor::ClipboardMonitor::new(monitor::MonitorConfig::default());
-    let monitor_handle = monitor.spawn(clipboard_tx);
-    tokio::spawn(ingest::run_ingest_loop(clipboard_rx, shared.clone()));
+    let monitor_handle = monitor.spawn(clipboard_tx, clipboard_write_rx);
+    tokio::spawn(ingest::run_ingest_loop(
+        clipboard_rx,
+        shared.clone(),
+        Some(signal_tx),
+    ));
 
     let connection = match zbus::connection::Builder::session() {
         Ok(builder) => match builder
@@ -51,11 +60,15 @@ async fn main() {
 
     info!("cosmic-paste daemon ready on {BUS_NAME}{OBJECT_PATH}");
 
+    let signal_connection = connection.clone();
+    let signal_task = tokio::spawn(signals::run_signal_emitter(signal_connection, signal_rx));
+
     let shutdown = wait_for_shutdown(lifecycle_rx).await;
     info!(?shutdown, "cosmic-paste daemon shutting down");
 
     flush_state(&shared).await;
     drop(connection);
+    signal_task.abort();
     monitor_handle.join();
 
     if shutdown == ShutdownReason::Reexecute {

@@ -19,11 +19,12 @@ GPaste-inspired clipboard manager for COSMIC (libcosmic native, daemon-centric).
 - **ADR-001** — `docs/adr/001-clipboard-monitor.md`: wlr-data-control + dedicated thread (accepted)
 - **PR 4** — `monitor/data_control.rs` (wlr-data-control), ingest loop, `SelfCopyGuard`, 35 tests
 - **PR 5** — systemd `Type=dbus` user unit, D-Bus activation file, journald logging, SIGTERM flush, `Reexecute`, `just install-user`
+- **PR 4 follow-up** — `Select` / `SelectAtOffset` clipboard write-back (wlr-data-control), `Update` + `ActiveIndexChanged` on clipboard ingest, 37 tests
 
 ## Next
 
-1. **PR 4 follow-up** — `Select` clipboard write-back + DBus `Update` signal on ingest; ext-data-control fallback
-2. **PR 6** — cosmic_config settings schema and hot-reload
+1. **PR 6** — cosmic_config settings schema and hot-reload
+2. **PR 4 follow-up (optional)** — ext-data-control fallback for compositors without wlr-data-control
 
 ## Key decisions (locked)
 

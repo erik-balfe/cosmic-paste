@@ -17,6 +17,8 @@ pub trait CosmicPaste {
 
     async fn select_at_offset(&self, offset: i32) -> zbus::Result<String>;
 
+    async fn select(&self, uuid: &str) -> zbus::Result<()>;
+
     async fn track(&self, tracking_state: bool) -> zbus::Result<()>;
 
     async fn on_applet_state_changed(&self, state: bool) -> zbus::Result<()>;
@@ -178,6 +180,28 @@ mod tests {
         proxy.reexecute().await.unwrap();
         lifecycle_rx.changed().await.unwrap();
         assert_eq!(*lifecycle_rx.borrow(), crate::dbus::lifecycle::ShutdownReason::Reexecute);
+    }
+
+    #[tokio::test]
+    async fn select_moves_item_to_front() {
+        let (_server, client, bus_name) = spawn_test_service().await;
+        let proxy = proxy(&client, &bus_name).await;
+
+        proxy.add("older").await.unwrap();
+        proxy.add("newer").await.unwrap();
+        let history = proxy.get_history().await.unwrap();
+        let older_uuid = history
+            .iter()
+            .find(|(_, text)| text == "older")
+            .map(|(uuid, _)| uuid.clone())
+            .expect("older entry");
+
+        proxy.select(&older_uuid).await.unwrap();
+
+        let history = proxy.get_history().await.unwrap();
+        assert_eq!(history[0].1, "older");
+        assert_eq!(history[1].1, "newer");
+        assert_eq!(proxy.get_active_index().await.unwrap(), 0);
     }
 
     #[tokio::test]

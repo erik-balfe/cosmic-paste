@@ -1,9 +1,12 @@
 //! DBus API constants, daemon state, service implementation, and client proxy.
 
+pub mod clipboard;
 pub mod client;
 pub mod lifecycle;
 pub mod service;
 pub mod state;
+
+pub use clipboard::{write_clipboard, ClipboardWriteRequest, ClipboardWriteSender};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const BUS_NAME: &str = "org.system76.CosmicPaste";
