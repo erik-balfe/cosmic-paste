@@ -1,6 +1,6 @@
 //! Clipboard write-back requests from DBus handlers to the Wayland monitor thread.
 
-use std::sync::mpsc::{Receiver, SyncSender};
+use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -28,9 +28,11 @@ impl ClipboardWriteRequest {
     }
 }
 
-pub type ClipboardWriteSender = Arc<std::sync::mpsc::Sender<ClipboardWriteRequest>>;
+pub type ClipboardWriteSender = Arc<SyncSender<ClipboardWriteRequest>>;
 
-const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
+pub const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
+
+pub const WRITE_QUEUE_DEPTH: usize = 8;
 
 /// Send a clipboard write and wait for the Wayland thread to complete it.
 pub async fn write_clipboard(
@@ -38,9 +40,19 @@ pub async fn write_clipboard(
     text: &str,
 ) -> zbus::fdo::Result<()> {
     let (request, reply_rx) = ClipboardWriteRequest::new(text.to_owned());
-    tx.send(request).map_err(|_| {
-        zbus::fdo::Error::Failed("clipboard writer unavailable".into())
-    })?;
+    match tx.try_send(request) {
+        Ok(()) => {}
+        Err(TrySendError::Full(_)) => {
+            return Err(zbus::fdo::Error::Failed(
+                "clipboard write queue is full".into(),
+            ));
+        }
+        Err(TrySendError::Disconnected(_)) => {
+            return Err(zbus::fdo::Error::Failed(
+                "clipboard writer unavailable".into(),
+            ));
+        }
+    }
 
     let result = tokio::task::spawn_blocking(move || reply_rx.recv_timeout(WRITE_TIMEOUT))
         .await

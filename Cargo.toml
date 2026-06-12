@@ -15,6 +15,7 @@ rust-version = "1.90"
 authors = ["Erik Balfe"]
 
 [workspace.dependencies]
+cosmic-config = { git = "https://github.com/pop-os/libcosmic", default-features = false, features = ["macro"] }
 cosmic-paste-core = { path = "cosmic-paste-core" }
 dirs = "6"
 ron = "0.12"

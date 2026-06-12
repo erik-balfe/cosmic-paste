@@ -45,15 +45,19 @@ impl Default for MonitorConfig {
 /// Handle to the background monitor thread.
 pub struct ClipboardMonitor {
     guard: Arc<Mutex<SelfCopyGuard>>,
-    config: MonitorConfig,
+    config: Arc<Mutex<MonitorConfig>>,
 }
 
 impl ClipboardMonitor {
     pub fn new(config: MonitorConfig) -> Self {
         Self {
             guard: Arc::new(Mutex::new(SelfCopyGuard::new())),
-            config,
+            config: Arc::new(Mutex::new(config)),
         }
+    }
+
+    pub fn shared_config(&self) -> Arc<Mutex<MonitorConfig>> {
+        self.config.clone()
     }
 
     /// Spawn the monitor thread and return the receiver for ingest.
@@ -63,7 +67,7 @@ impl ClipboardMonitor {
         write_rx: mpsc::Receiver<ClipboardWriteRequest>,
     ) -> MonitorHandle {
         let guard = self.guard.clone();
-        let config = self.config;
+        let config = self.config.clone();
         let join = std::thread::Builder::new()
             .name("cosmic-paste-wayland".into())
             .spawn(move || {

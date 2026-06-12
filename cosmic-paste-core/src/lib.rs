@@ -10,6 +10,7 @@ pub mod error;
 pub mod history;
 pub mod item;
 pub mod persistence;
+pub mod settings;
 
 pub use active_index::ActiveIndexState;
 pub use error::{Error, Result};
@@ -18,6 +19,7 @@ pub use item::{truncate_display, HistoryItem, ItemKind, RichPayload};
 pub use dbus::{
     client::CosmicPasteProxy, BUS_NAME, INTERFACE_NAME, OBJECT_PATH, VERSION as DAEMON_VERSION,
 };
+pub use settings::{Settings, ShortcutSettings, APP_ID as SETTINGS_APP_ID};
 pub use persistence::{
     checksum_hex, DataPaths, HistoryFile, HistoryStore, LoadHistoryOutcome, PersistenceError,
     SessionState, FORMAT_MAGIC, FORMAT_VERSION,

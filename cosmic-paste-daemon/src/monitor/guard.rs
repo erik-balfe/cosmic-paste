@@ -11,7 +11,8 @@ pub struct SelfCopyGuard {
 impl SelfCopyGuard {
     pub fn new() -> Self {
         Self {
-            window: Duration::from_millis(500),
+            // Cover clipboard write timeout (2s) plus monitor debounce slack.
+            window: Duration::from_millis(2500),
             last_fingerprint: None,
             last_set: None,
         }

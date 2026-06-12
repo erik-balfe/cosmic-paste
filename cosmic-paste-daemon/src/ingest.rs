@@ -47,30 +47,50 @@ pub async fn run_ingest_loop(
             continue;
         }
 
-        if let Err(err) = guard.persist() {
+        if guard.save_history()
+            && let Err(err) = guard.persist()
+        {
             tracing::error!("failed to persist clipboard ingest: {err}");
             continue;
         }
 
-        let uuid = guard
-            .history()
-            .get(0)
-            .map(|item| item.uuid.to_string())
-            .unwrap_or_default();
+        let action = match &outcome {
+            IngestOutcome::Added => "add",
+            IngestOutcome::MovedExisting { .. } => "add",
+            IngestOutcome::ReplacedGrowingLine { .. } => "replace",
+            IngestOutcome::RejectedTextSize => continue,
+        };
+        let uuid = match &outcome {
+            IngestOutcome::Added => guard
+                .history()
+                .get(0)
+                .map(|item| item.uuid.to_string())
+                .unwrap_or_default(),
+            IngestOutcome::MovedExisting { uuid } | IngestOutcome::ReplacedGrowingLine { uuid } => {
+                uuid.to_string()
+            }
+            IngestOutcome::RejectedTextSize => continue,
+        };
         let count = guard.history().len() as u32;
         drop(guard);
 
         if let Some(tx) = &signal_tx {
-            let _ = tx
-                .send(DaemonSignal::Update {
-                    action: "add",
+            if tx
+                .try_send(DaemonSignal::Update {
+                    action,
                     target: uuid,
                     index: 0,
                 })
-                .await;
-            let _ = tx
-                .send(DaemonSignal::ActiveIndexChanged { index: 0, count })
-                .await;
+                .is_err()
+            {
+                tracing::warn!("dropped clipboard Update signal (channel full)");
+            }
+            if tx
+                .try_send(DaemonSignal::ActiveIndexChanged { index: 0, count })
+                .is_err()
+            {
+                tracing::warn!("dropped ActiveIndexChanged signal (channel full)");
+            }
         }
 
         tracing::debug!(

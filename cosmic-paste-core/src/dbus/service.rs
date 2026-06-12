@@ -148,8 +148,9 @@ impl CosmicPasteService {
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         offset: i32,
     ) -> zbus::fdo::Result<String> {
-        let (uuid, text, index, count) = self
+        let (uuid, text, index, count, rollback) = self
             .with_state(|state| {
+                let rollback = state.session.clone();
                 let (index, item) = state
                     .session_mut()
                     .select_at_offset(offset)
@@ -157,14 +158,27 @@ impl CosmicPasteService {
                 let uuid = item.uuid.to_string();
                 let text = element_value(item);
                 let history_len = state.history().len();
-                state.persist().map_err(|e| {
-                    zbus::fdo::Error::Failed(format!("failed to persist session state: {e}"))
-                })?;
-                Ok((uuid, text, index as u32, history_len as u32))
+                Ok((uuid, text, index as u32, history_len as u32, rollback))
             })
             .await?;
 
-        self.write_clipboard_text(&text).await?;
+        if let Err(err) = self.write_clipboard_text(&text).await {
+            let _ = self
+                .with_state(|state| {
+                    state.session = rollback;
+                    Ok(())
+                })
+                .await;
+            return Err(err);
+        }
+
+        self.with_state(|state| {
+            state.persist().map_err(|e| {
+                zbus::fdo::Error::Failed(format!("failed to persist session state: {e}"))
+            })
+        })
+        .await?;
+
         Self::update(emitter.clone(), "select", &uuid, index).await?;
         Self::emit_active_index_changed(emitter, index, count).await?;
         Ok(uuid)
@@ -180,7 +194,7 @@ impl CosmicPasteService {
 
     async fn on_applet_state_changed(&self, present: bool) -> zbus::fdo::Result<()> {
         self.with_state(|state| {
-            state.applet_present = present;
+            state.on_applet_present_changed(present);
             Ok(())
         })
         .await
@@ -368,8 +382,9 @@ impl CosmicPasteService {
         uuid: &str,
     ) -> zbus::fdo::Result<()> {
         let parsed = parse_uuid(uuid)?;
-        let (target, text, index, count) = self
+        let (target, text, index, count, rollback) = self
             .with_state(|state| {
+                let rollback = state.session.clone();
                 let index = state.session_mut().select(parsed).map_err(map_error)?;
                 let item = state
                     .history()
@@ -378,14 +393,27 @@ impl CosmicPasteService {
                 let target = item.uuid.to_string();
                 let text = element_value(item);
                 let count = state.history().len() as u32;
-                state.persist().map_err(|e| {
-                    zbus::fdo::Error::Failed(format!("failed to persist select: {e}"))
-                })?;
-                Ok((target, text, index as u32, count))
+                Ok((target, text, index as u32, count, rollback))
             })
             .await?;
 
-        self.write_clipboard_text(&text).await?;
+        if let Err(err) = self.write_clipboard_text(&text).await {
+            let _ = self
+                .with_state(|state| {
+                    state.session = rollback;
+                    Ok(())
+                })
+                .await;
+            return Err(err);
+        }
+
+        self.with_state(|state| {
+            state.persist().map_err(|e| {
+                zbus::fdo::Error::Failed(format!("failed to persist select: {e}"))
+            })
+        })
+        .await?;
+
         Self::update(emitter.clone(), "select", &target, index).await?;
         Self::emit_active_index_changed(emitter, index, count).await?;
         Ok(())

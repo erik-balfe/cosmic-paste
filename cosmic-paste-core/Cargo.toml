@@ -8,6 +8,7 @@ description = "Core types and history logic for cosmic-paste"
 publish = false
 
 [dependencies]
+cosmic-config = { workspace = true }
 dirs = { workspace = true }
 ron = { workspace = true }
 serde = { workspace = true }

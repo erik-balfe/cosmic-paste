@@ -7,6 +7,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use cosmic_paste_core::dbus::clipboard::WRITE_TIMEOUT;
 use cosmic_paste_core::dbus::ClipboardWriteRequest;
 use cosmic_paste_core::item::text_checksum;
 use tokio::sync::mpsc as async_mpsc;
@@ -51,6 +52,7 @@ struct PendingSelection {
 
 struct SourcePayload {
     data: Vec<u8>,
+    posted_at: Instant,
     reply: Option<std::sync::mpsc::SyncSender<Result<(), String>>>,
 }
 
@@ -60,7 +62,7 @@ struct State {
     offers: HashMap<ZwlrDataControlOfferV1, HashSet<String>>,
     sources: HashMap<ZwlrDataControlSourceV1, SourcePayload>,
     pending: Option<PendingSelection>,
-    config: MonitorConfig,
+    config: Arc<Mutex<MonitorConfig>>,
     guard: Arc<Mutex<SelfCopyGuard>>,
     tx: async_mpsc::Sender<ClipboardEvent>,
     write_rx: mpsc::Receiver<ClipboardWriteRequest>,
@@ -69,7 +71,7 @@ struct State {
 pub fn run(
     tx: async_mpsc::Sender<ClipboardEvent>,
     write_rx: mpsc::Receiver<ClipboardWriteRequest>,
-    config: MonitorConfig,
+    config: Arc<Mutex<MonitorConfig>>,
     guard: Arc<Mutex<SelfCopyGuard>>,
 ) -> Result<(), MonitorError> {
     let conn = Connection::connect_to_env()?;
@@ -127,6 +129,7 @@ pub fn run(
     tracing::info!("wlr-data-control clipboard monitor connected");
 
     loop {
+        state.expire_stale_sources();
         state.process_write_requests(&qh)?;
         queue.blocking_dispatch(&mut state)?;
         if let Err(err) = state.flush_pending(&mut queue) {
@@ -171,12 +174,24 @@ impl SeatData {
 }
 
 impl State {
+    fn expire_stale_sources(&mut self) {
+        let stale: Vec<ZwlrDataControlSourceV1> = self
+            .sources
+            .iter()
+            .filter(|(_, payload)| payload.posted_at.elapsed() > WRITE_TIMEOUT)
+            .map(|(source, _)| source.clone())
+            .collect();
+
+        for source in stale {
+            self.fail_source(&source, "clipboard write timed out");
+        }
+    }
+
     fn process_write_requests(&mut self, qh: &QueueHandle<Self>) -> Result<(), MonitorError> {
         while let Ok(request) = self.write_rx.try_recv() {
-            self.guard
-                .lock()
-                .expect("self-copy guard lock")
-                .arm(request.fingerprint);
+            if let Ok(mut guard) = self.guard.lock() {
+                guard.arm(request.fingerprint);
+            }
 
             let source = self.manager.create_data_source(qh, ());
             source.offer("text/plain".to_string());
@@ -184,6 +199,7 @@ impl State {
                 source.clone(),
                 SourcePayload {
                     data: request.text.into_bytes(),
+                    posted_at: Instant::now(),
                     reply: Some(request.reply),
                 },
             );
@@ -234,7 +250,12 @@ impl State {
             return Ok(());
         };
 
-        if pending.changed_at.elapsed() < self.config.debounce {
+        let debounce = self
+            .config
+            .lock()
+            .map(|cfg| cfg.debounce)
+            .unwrap_or_default();
+        if pending.changed_at.elapsed() < debounce {
             return Ok(());
         }
 
@@ -252,8 +273,8 @@ impl State {
         if self
             .guard
             .lock()
-            .expect("self-copy guard lock")
-            .should_ignore(fingerprint)
+            .ok()
+            .is_some_and(|guard| guard.should_ignore(fingerprint))
         {
             tracing::debug!("ignoring self-copy clipboard notification");
             return Ok(());
@@ -392,7 +413,12 @@ impl Dispatch<ZwlrDataControlDeviceV1, WlSeat> for State {
             }
             zwlr_data_control_device_v1::Event::PrimarySelection { id } => {
                 data.set_primary_offer(id.clone());
-                if state.config.watch_primary && let Some(offer) = id {
+                let watch_primary = state
+                    .config
+                    .lock()
+                    .map(|cfg| cfg.watch_primary)
+                    .unwrap_or(false);
+                if watch_primary && let Some(offer) = id {
                     state.schedule_selection(SelectionSource::Primary, offer);
                 }
             }

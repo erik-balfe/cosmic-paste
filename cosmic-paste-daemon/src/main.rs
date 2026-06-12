@@ -1,8 +1,10 @@
+mod config;
 mod ingest;
 mod lifecycle;
 mod monitor;
 mod signals;
 
+use cosmic_paste_core::dbus::clipboard::WRITE_QUEUE_DEPTH;
 use cosmic_paste_core::dbus::lifecycle::ShutdownReason;
 use cosmic_paste_core::dbus::state::DaemonState;
 use cosmic_paste_core::{BUS_NAME, OBJECT_PATH};
@@ -22,8 +24,11 @@ async fn main() {
         }
     };
 
-    let (clipboard_write_tx, clipboard_write_rx) = std::sync::mpsc::channel();
+    let (clipboard_write_tx, clipboard_write_rx) =
+        std::sync::mpsc::sync_channel(WRITE_QUEUE_DEPTH);
     daemon.set_clipboard_writer(clipboard_write_tx);
+
+    let watch_primary = daemon.settings.primary_to_history;
 
     let (lifecycle, lifecycle_rx) = LifecycleHandle::pair();
     let service = daemon.service(lifecycle);
@@ -31,7 +36,12 @@ async fn main() {
 
     let (clipboard_tx, clipboard_rx) = mpsc::channel(64);
     let (signal_tx, signal_rx) = mpsc::channel(64);
-    let monitor = monitor::ClipboardMonitor::new(monitor::MonitorConfig::default());
+    let monitor = monitor::ClipboardMonitor::new(monitor::MonitorConfig {
+        watch_primary,
+        ..monitor::MonitorConfig::default()
+    });
+    let monitor_config = monitor.shared_config();
+    let _config_watcher = config::spawn_config_watcher(shared.clone(), monitor_config);
     let monitor_handle = monitor.spawn(clipboard_tx, clipboard_write_rx);
     tokio::spawn(ingest::run_ingest_loop(
         clipboard_rx,

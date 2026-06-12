@@ -1,0 +1,37 @@
+// cosmic-paste settings schema (cosmic_config v1).
+// Each key is stored as an individual RON file under:
+//   ~/.config/cosmic/com.system76.CosmicPaste/v1/<key>
+//
+// See `cosmic-paste-core/src/settings.rs` for defaults and types.
+
+{
+    "app_id": "com.system76.CosmicPaste",
+    "version": 1,
+    "keys": [
+        "element_size",
+        "growing_lines",
+        "history_name",
+        "images_support",
+        "images_preview",
+        "images_preview_size",
+        "close_on_select",
+        "open_centered",
+        "max_displayed_history_size",
+        "max_history_size",
+        "max_memory_usage_mb",
+        "max_text_item_size",
+        "min_text_item_size",
+        "primary_to_history",
+        "rich_text_support",
+        "save_history",
+        "track_changes",
+        "trim_items",
+        "synchronize_clipboards",
+        "empty_history_confirmation",
+        "navigation_wrap",
+        "track_applet_state",
+        "screensaver_restore_clipboard",
+        "excluded_targets",
+        "shortcuts"
+    ]
+}
