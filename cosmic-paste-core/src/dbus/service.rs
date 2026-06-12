@@ -1,6 +1,7 @@
 use zbus::interface;
 use zbus::object_server::SignalEmitter;
 
+use super::lifecycle::{LifecycleHandle, ShutdownReason};
 use super::state::SharedDaemonState;
 use super::{element_value, item_kind_name, parse_uuid, VERSION};
 use crate::error::Error;
@@ -44,11 +45,12 @@ fn not_supported(method: &str) -> zbus::fdo::Error {
 /// GPaste2-compatible DBus service for cosmic-paste.
 pub struct CosmicPasteService {
     state: SharedDaemonState,
+    lifecycle: LifecycleHandle,
 }
 
 impl CosmicPasteService {
-    pub fn new(state: SharedDaemonState) -> Self {
-        Self { state }
+    pub fn new(state: SharedDaemonState, lifecycle: LifecycleHandle) -> Self {
+        Self { state, lifecycle }
     }
 
     pub fn shared_state(&self) -> SharedDaemonState {
@@ -372,7 +374,15 @@ impl CosmicPasteService {
     }
 
     async fn reexecute(&self) -> zbus::fdo::Result<()> {
-        Err(not_supported("Reexecute"))
+        self.with_state(|state| {
+            state.persist().map_err(|err| {
+                zbus::fdo::Error::Failed(format!("failed to flush state before reexecute: {err}"))
+            })?;
+            Ok(())
+        })
+        .await?;
+        self.lifecycle.request(ShutdownReason::Reexecute);
+        Ok(())
     }
 
     async fn about(&self) -> zbus::fdo::Result<()> {

@@ -31,3 +31,13 @@ Writes are atomic: `*.tmp.<pid>` in the same directory, `fsync`, then `rename(2)
 1. Parse primary `*.ron`
 2. On failure, parse `*.ron.bak`
 3. If both fail, rename primary to `*.ron.corrupt` and start with an empty in-memory history
+
+## Packaged / user install paths
+
+| Artifact | System path | User dev install (`just install-user`) |
+|----------|-------------|----------------------------------------|
+| systemd unit | `/usr/lib/systemd/user/com.system76.CosmicPaste.service` | `~/.config/systemd/user/com.system76.CosmicPaste.service` |
+| D-Bus activation | `/usr/share/dbus-1/services/com.system76.CosmicPaste.service` | `~/.local/share/dbus-1/services/com.system76.CosmicPaste.service` |
+| daemon binary | `/usr/bin/cosmic-paste-daemon` | `target/debug/cosmic-paste-daemon` (substituted at install) |
+
+DBus activation uses `Type=dbus` — systemd starts the daemon when the bus name is first requested.

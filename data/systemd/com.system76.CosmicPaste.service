@@ -1,0 +1,13 @@
+[Unit]
+Description=COSMIC Paste clipboard daemon
+Documentation=https://github.com/pop-os/cosmic-epoch
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.system76.CosmicPaste
+ExecStart=@bindir@/cosmic-paste-daemon
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

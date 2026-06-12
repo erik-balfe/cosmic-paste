@@ -31,6 +31,8 @@ pub trait CosmicPaste {
 
     async fn list_histories(&self) -> zbus::Result<Vec<String>>;
 
+    async fn reexecute(&self) -> zbus::Result<()>;
+
     #[zbus(property)]
     fn active(&self) -> zbus::Result<bool>;
 
@@ -61,7 +63,8 @@ mod tests {
     static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     async fn spawn_test_service() -> (zbus::Connection, zbus::Connection, String) {
-        let service = DaemonState::new_in_memory().service();
+        let service =
+            DaemonState::new_in_memory().service(crate::dbus::lifecycle::LifecycleHandle::detached());
         let bus_name = format!(
             "{BUS_NAME}.test{}.case{}",
             std::process::id(),
@@ -138,6 +141,43 @@ mod tests {
         assert!(!proxy.applet_present().await.unwrap());
         proxy.on_applet_state_changed(true).await.unwrap();
         assert!(proxy.applet_present().await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn reexecute_signals_lifecycle() {
+        let (lifecycle, mut lifecycle_rx) = crate::dbus::lifecycle::LifecycleHandle::pair();
+        let service = DaemonState::new_in_memory().service(lifecycle);
+        let bus_name = format!("{BUS_NAME}.Test{}.reexec", std::process::id());
+
+        let _server = zbus::connection::Builder::session()
+            .unwrap()
+            .name(bus_name.as_str())
+            .unwrap()
+            .serve_at(OBJECT_PATH, service)
+            .unwrap()
+            .build()
+            .await
+            .unwrap();
+
+        let client = zbus::connection::Builder::session()
+            .unwrap()
+            .build()
+            .await
+            .unwrap();
+
+        let proxy = CosmicPasteProxy::builder(&client)
+            .destination(bus_name.as_str())
+            .unwrap()
+            .path(OBJECT_PATH)
+            .unwrap()
+            .cache_properties(zbus::proxy::CacheProperties::No)
+            .build()
+            .await
+            .unwrap();
+
+        proxy.reexecute().await.unwrap();
+        lifecycle_rx.changed().await.unwrap();
+        assert_eq!(*lifecycle_rx.borrow(), crate::dbus::lifecycle::ShutdownReason::Reexecute);
     }
 
     #[tokio::test]

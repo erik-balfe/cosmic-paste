@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
+use crate::dbus::lifecycle::LifecycleHandle;
 use crate::dbus::service::CosmicPasteService;
 use crate::persistence::{DataPaths, HistoryStore, LoadHistoryOutcome, SessionState};
 use crate::{History, HistoryPolicies, HistorySession};
@@ -54,8 +55,8 @@ impl DaemonState {
         })
     }
 
-    pub fn service(self) -> CosmicPasteService {
-        CosmicPasteService::new(Arc::new(Mutex::new(self)))
+    pub fn service(self, lifecycle: LifecycleHandle) -> CosmicPasteService {
+        CosmicPasteService::new(Arc::new(Mutex::new(self)), lifecycle)
     }
 
     pub fn persist(&self) -> crate::persistence::PersistenceResult<()> {

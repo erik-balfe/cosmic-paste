@@ -1,19 +1,17 @@
 mod ingest;
+mod lifecycle;
 mod monitor;
 
+use cosmic_paste_core::dbus::lifecycle::ShutdownReason;
 use cosmic_paste_core::dbus::state::DaemonState;
 use cosmic_paste_core::{BUS_NAME, OBJECT_PATH};
+use lifecycle::{flush_state, init_logging, reexec_or_exit, wait_for_shutdown, LifecycleHandle};
 use tokio::sync::mpsc;
 use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    init_logging();
 
     let daemon = match DaemonState::load_default() {
         Ok(state) => state,
@@ -23,13 +21,14 @@ async fn main() {
         }
     };
 
-    let service = daemon.service();
+    let (lifecycle, lifecycle_rx) = LifecycleHandle::pair();
+    let service = daemon.service(lifecycle);
     let shared = service.shared_state();
 
     let (clipboard_tx, clipboard_rx) = mpsc::channel(64);
     let monitor = monitor::ClipboardMonitor::new(monitor::MonitorConfig::default());
     let monitor_handle = monitor.spawn(clipboard_tx);
-    tokio::spawn(ingest::run_ingest_loop(clipboard_rx, shared));
+    tokio::spawn(ingest::run_ingest_loop(clipboard_rx, shared.clone()));
 
     let connection = match zbus::connection::Builder::session() {
         Ok(builder) => match builder
@@ -52,12 +51,15 @@ async fn main() {
 
     info!("cosmic-paste daemon ready on {BUS_NAME}{OBJECT_PATH}");
 
-    if let Err(err) = tokio::signal::ctrl_c().await {
-        error!("failed to listen for shutdown signal: {err}");
-        std::process::exit(1);
-    }
+    let shutdown = wait_for_shutdown(lifecycle_rx).await;
+    info!(?shutdown, "cosmic-paste daemon shutting down");
 
+    flush_state(&shared).await;
     drop(connection);
     monitor_handle.join();
-    info!("cosmic-paste daemon shutting down");
+
+    if shutdown == ShutdownReason::Reexecute {
+        info!("reexecuting cosmic-paste-daemon");
+        reexec_or_exit(0);
+    }
 }

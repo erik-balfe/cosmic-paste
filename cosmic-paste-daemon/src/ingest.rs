@@ -67,7 +67,9 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_loop_adds_text_to_history() {
-        let state = DaemonState::new_in_memory().service().shared_state();
+        let state = DaemonState::new_in_memory()
+            .service(cosmic_paste_core::dbus::lifecycle::LifecycleHandle::detached())
+            .shared_state();
         let (tx, rx) = mpsc::channel(4);
 
         let ingest = tokio::spawn(run_ingest_loop(rx, state.clone()));
@@ -94,7 +96,9 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_loop_skips_non_text_mime() {
-        let state = DaemonState::new_in_memory().service().shared_state();
+        let state = DaemonState::new_in_memory()
+            .service(cosmic_paste_core::dbus::lifecycle::LifecycleHandle::detached())
+            .shared_state();
         let (tx, rx) = mpsc::channel(4);
 
         let ingest = tokio::spawn(run_ingest_loop(rx, state.clone()));

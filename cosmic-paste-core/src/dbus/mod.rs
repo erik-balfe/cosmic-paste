@@ -1,6 +1,7 @@
 //! DBus API constants, daemon state, service implementation, and client proxy.
 
 pub mod client;
+pub mod lifecycle;
 pub mod service;
 pub mod state;
 
