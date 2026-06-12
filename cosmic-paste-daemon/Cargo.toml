@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "cosmic-paste background daemon (stub — PR 3+)"
+description = "cosmic-paste background daemon (DBus + clipboard monitor)"
 publish = false
 
 [[bin]]
@@ -13,7 +13,13 @@ path = "src/main.rs"
 
 [dependencies]
 cosmic-paste-core = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+wayland-client = { workspace = true }
+wayland-protocols-wlr = { workspace = true }
 zbus = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -1,5 +1,9 @@
+mod ingest;
+mod monitor;
+
 use cosmic_paste_core::dbus::state::DaemonState;
 use cosmic_paste_core::{BUS_NAME, OBJECT_PATH};
+use tokio::sync::mpsc;
 use tracing::{error, info};
 
 #[tokio::main]
@@ -20,6 +24,13 @@ async fn main() {
     };
 
     let service = daemon.service();
+    let shared = service.shared_state();
+
+    let (clipboard_tx, clipboard_rx) = mpsc::channel(64);
+    let monitor = monitor::ClipboardMonitor::new(monitor::MonitorConfig::default());
+    let monitor_handle = monitor.spawn(clipboard_tx);
+    tokio::spawn(ingest::run_ingest_loop(clipboard_rx, shared));
+
     let connection = match zbus::connection::Builder::session() {
         Ok(builder) => match builder
             .name(BUS_NAME)
@@ -47,5 +58,6 @@ async fn main() {
     }
 
     drop(connection);
+    monitor_handle.join();
     info!("cosmic-paste daemon shutting down");
 }

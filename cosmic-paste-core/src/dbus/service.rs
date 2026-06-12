@@ -51,6 +51,10 @@ impl CosmicPasteService {
         Self { state }
     }
 
+    pub fn shared_state(&self) -> SharedDaemonState {
+        self.state.clone()
+    }
+
     async fn with_state<F, T>(&self, f: F) -> zbus::fdo::Result<T>
     where
         F: FnOnce(&mut super::state::DaemonState) -> zbus::fdo::Result<T>,

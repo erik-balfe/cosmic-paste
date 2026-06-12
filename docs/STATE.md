@@ -16,10 +16,13 @@ GPaste-inspired clipboard manager for COSMIC (libcosmic native, daemon-centric).
 - **PR 2** — `persistence.rs`: RON + magic header, atomic save, `.bak` recovery, blob store, `state.json`
 - **PR 3** — `org.system76.CosmicPaste2` zbus service + client proxy in `cosmic-paste-core`, daemon entrypoint, `data/dbus/org.system76.CosmicPaste.xml`; 30 tests
 
+- **ADR-001** — `docs/adr/001-clipboard-monitor.md`: wlr-data-control + dedicated thread (accepted)
+- **PR 4** — `monitor/data_control.rs` (wlr-data-control), ingest loop, `SelfCopyGuard`, 35 tests
+
 ## Next
 
-1. **ADR-001 spike** (before PR 4) — wlr-data-control vs alternatives on COSMIC hardware
-2. **PR 4** — clipboard monitor + text ingest (gated on ADR-001)
+1. **PR 4 follow-up** — `Select` clipboard write-back + DBus `Update` signal on ingest; ext-data-control fallback
+2. **PR 5** — systemd `Type=dbus` activation
 
 ## Key decisions (locked)
 

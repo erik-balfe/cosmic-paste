@@ -10,7 +10,7 @@ GPaste-inspired clipboard manager for the [COSMIC](https://github.com/pop-os/cos
 | Crate | Binary | Role |
 |-------|--------|------|
 | `cosmic-paste-core` | — | History, items, active-index state machine |
-| `cosmic-paste-daemon` | `cosmic-paste-daemon` | Clipboard monitor + DBus (stub) |
+| `cosmic-paste-daemon` | `cosmic-paste-daemon` | DBus server (clipboard monitor in PR 4) |
 | `cosmic-paste-applet` | `cosmic-paste-applet` | Panel indicator + popup (stub) |
 | `cosmic-paste-ui` | `cosmic-paste-ui` | Full history window (stub) |
 | `cosmic-paste-cli` | `cosmic-paste` | CLI client (stub) |
@@ -25,4 +25,4 @@ just check    # clippy
 
 ## Development
 
-PR 1 delivers in-memory core types only. Next: persistence (PR 2), DBus skeleton (PR 3), then ADR-001 clipboard monitor spike before PR 4.
+PRs 1–3 are in tree: core types, persistence, and `CosmicPaste2` DBus skeleton. Next: ADR-001 clipboard monitor spike, then PR 4 text ingest.
