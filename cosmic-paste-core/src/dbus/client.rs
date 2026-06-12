@@ -35,6 +35,8 @@ pub trait CosmicPaste {
 
     async fn reexecute(&self) -> zbus::Result<()>;
 
+    async fn show_history(&self) -> zbus::Result<()>;
+
     #[zbus(property)]
     fn active(&self) -> zbus::Result<bool>;
 

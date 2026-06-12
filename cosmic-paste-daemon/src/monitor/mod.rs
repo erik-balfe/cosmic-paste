@@ -3,6 +3,7 @@
 mod data_control;
 mod guard;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -68,26 +69,41 @@ impl ClipboardMonitor {
     ) -> MonitorHandle {
         let guard = self.guard.clone();
         let config = self.config.clone();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown_thread = shutdown.clone();
+        let clipboard_tx = tx.clone();
         let join = std::thread::Builder::new()
             .name("cosmic-paste-wayland".into())
             .spawn(move || {
-                if let Err(err) = data_control::run(tx, write_rx, config, guard) {
+                if let Err(err) = data_control::run(tx, write_rx, config, guard, shutdown_thread)
+                {
                     tracing::error!("clipboard monitor exited: {err}");
                 }
             })
             .expect("spawn wayland monitor thread");
 
-        MonitorHandle { join }
+        MonitorHandle {
+            join,
+            shutdown,
+            clipboard_tx: Some(clipboard_tx),
+        }
     }
 }
 
 pub struct MonitorHandle {
     join: std::thread::JoinHandle<()>,
+    shutdown: Arc<AtomicBool>,
+    clipboard_tx: Option<async_mpsc::Sender<ClipboardEvent>>,
 }
 
 impl MonitorHandle {
-    pub fn join(self) {
-        let _ = self.join.join();
+    pub fn shutdown(mut self) {
+        self.shutdown.store(true, Ordering::Relaxed);
+        drop(self.clipboard_tx.take());
+        match self.join.join() {
+            Ok(()) => tracing::debug!("clipboard monitor thread joined"),
+            Err(_) => tracing::warn!("clipboard monitor thread panicked"),
+        }
     }
 }
 

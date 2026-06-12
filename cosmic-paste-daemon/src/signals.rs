@@ -13,6 +13,7 @@ pub enum DaemonSignal {
         index: u32,
         count: u32,
     },
+    ShowHistory,
 }
 
 pub async fn run_signal_emitter(
@@ -47,6 +48,11 @@ pub async fn run_signal_emitter(
                     CosmicPasteService::emit_active_index(emitter, index, count).await
                 {
                     tracing::warn!("failed to emit ActiveIndexChanged signal: {err}");
+                }
+            }
+            DaemonSignal::ShowHistory => {
+                if let Err(err) = CosmicPasteService::emit_show_history(emitter).await {
+                    tracing::warn!("failed to emit ShowHistory signal: {err}");
                 }
             }
         }

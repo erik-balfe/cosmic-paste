@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.system76.CosmicPaste
+Exec=@bindir@/cosmic-paste-daemon
+SystemdService=com.system76.CosmicPaste.service

@@ -15,7 +15,9 @@ rust-version = "1.90"
 authors = ["Erik Balfe"]
 
 [workspace.dependencies]
+ashpd = { version = "0.11", default-features = false, features = ["tokio"] }
 cosmic-config = { git = "https://github.com/pop-os/libcosmic", default-features = false, features = ["macro"] }
+futures-util = "0.3"
 cosmic-paste-core = { path = "cosmic-paste-core" }
 dirs = "6"
 ron = "0.12"
@@ -30,3 +32,4 @@ uuid = { version = "1", features = ["v4", "serde"] }
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 zbus = { version = "5.13", default-features = false, features = ["tokio"] }
+clap = { version = "4.5", features = ["derive"] }

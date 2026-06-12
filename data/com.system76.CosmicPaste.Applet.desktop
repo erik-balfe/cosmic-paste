@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=COSMIC Paste
+Name[en]=COSMIC Paste
+Comment=Clipboard history panel applet
+Comment[en]=Clipboard history panel applet
+Exec=@bindir@/cosmic-paste-applet %u
+Terminal=false
+NoDisplay=true
+Categories=COSMIC;
+Keywords=COSMIC;Applet;Clipboard;Paste;History;
+Icon=com.system76.CosmicPaste.Applet-symbolic
+X-CosmicApplet=true
+X-HostWaylandDisplay=true
+X-CosmicHoverPopup=End

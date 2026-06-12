@@ -427,8 +427,19 @@ impl CosmicPasteService {
         Err(not_supported("SwitchHistory"))
     }
 
-    async fn show_history(&self) -> zbus::fdo::Result<()> {
-        Err(not_supported("ShowHistory"))
+    async fn show_history(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> zbus::fdo::Result<()> {
+        let present = self.state.lock().await.applet_present;
+        if !present {
+            return Err(zbus::fdo::Error::Failed(
+                "applet not in panel — add COSMIC Paste to the panel, or use `cosmic-paste history`"
+                    .into(),
+            ));
+        }
+        Self::emit_show_history(emitter).await?;
+        Ok(())
     }
 
     async fn reexecute(&self) -> zbus::fdo::Result<()> {
@@ -516,6 +527,10 @@ impl CosmicPasteService {
         count: u32,
     ) -> zbus::Result<()> {
         Self::emit_active_index_changed(emitter, index, count).await
+    }
+
+    pub async fn emit_show_history(emitter: SignalEmitter<'_>) -> zbus::Result<()> {
+        Self::notify_show_history(emitter).await
     }
 
     async fn write_clipboard_text(&self, text: &str) -> zbus::fdo::Result<()> {

@@ -8,6 +8,10 @@ Type=dbus
 BusName=org.system76.CosmicPaste
 ExecStart=@bindir@/cosmic-paste-daemon
 Restart=on-failure
+TimeoutStopSec=10
+KillMode=mixed
+# Inherit WAYLAND_DISPLAY / XDG_RUNTIME_DIR from the graphical session.
+ImportEnvironment=WAYLAND_DISPLAY XDG_RUNTIME_DIR DISPLAY
 
 [Install]
 WantedBy=graphical-session.target

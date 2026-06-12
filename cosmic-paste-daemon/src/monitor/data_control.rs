@@ -3,9 +3,13 @@
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::os::fd::AsFd;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+use rustix::event::{poll, PollFd, PollFlags};
+use rustix::fs::{fcntl_getfl, fcntl_setfl, OFlags};
 
 use cosmic_paste_core::dbus::clipboard::WRITE_TIMEOUT;
 use cosmic_paste_core::dbus::ClipboardWriteRequest;
@@ -48,6 +52,7 @@ struct PendingSelection {
     source: SelectionSource,
     offer: ZwlrDataControlOfferV1,
     changed_at: Instant,
+    has_text_mime: bool,
 }
 
 struct SourcePayload {
@@ -73,6 +78,7 @@ pub fn run(
     write_rx: mpsc::Receiver<ClipboardWriteRequest>,
     config: Arc<Mutex<MonitorConfig>>,
     guard: Arc<Mutex<SelfCopyGuard>>,
+    shutdown: Arc<AtomicBool>,
 ) -> Result<(), MonitorError> {
     let conn = Connection::connect_to_env()?;
     let (globals, mut queue) = registry_queue_init::<State>(&conn).map_err(|err| match err {
@@ -126,18 +132,68 @@ pub fn run(
         write_rx,
     };
 
+    // Drain the compositor's initial selection broadcast for new devices.
+    queue.roundtrip(&mut state)?;
+    while queue.dispatch_pending(&mut state)? > 0 {}
+
     tracing::info!("wlr-data-control clipboard monitor connected");
 
-    loop {
+    while !shutdown.load(Ordering::Relaxed) {
         state.expire_stale_sources();
         state.process_write_requests(&qh)?;
-        queue.blocking_dispatch(&mut state)?;
+
+        while queue.dispatch_pending(&mut state)? > 0 {
+            if let Err(err) = state.flush_pending(&mut queue) {
+                tracing::info!("stopping clipboard monitor: {err}");
+                return Ok(());
+            }
+        }
         if let Err(err) = state.flush_pending(&mut queue) {
             tracing::info!("stopping clipboard monitor: {err}");
+            return Ok(());
+        }
+
+        if shutdown.load(Ordering::Relaxed) {
             break;
+        }
+
+        if let Err(err) = queue.flush() {
+            return Err(MonitorError::Dispatch(wayland_client::DispatchError::Backend(
+                err,
+            )));
+        }
+        let Some(read_guard) = queue.prepare_read() else {
+            std::thread::sleep(Duration::from_millis(50));
+            continue;
+        };
+
+        let fd = read_guard.connection_fd();
+        let mut poll_fds = [PollFd::from_borrowed_fd(fd, PollFlags::IN)];
+        match poll(&mut poll_fds, 200) {
+            Ok(0) => {}
+            Ok(_) if poll_fds[0].revents().contains(PollFlags::IN) => {
+                if let Err(err) = read_guard.read() {
+                    return Err(MonitorError::Dispatch(wayland_client::DispatchError::Backend(
+                        err,
+                    )));
+                }
+                while queue.dispatch_pending(&mut state)? > 0 {
+                    if let Err(err) = state.flush_pending(&mut queue) {
+                        tracing::info!("stopping clipboard monitor: {err}");
+                        return Ok(());
+                    }
+                }
+                if let Err(err) = state.flush_pending(&mut queue) {
+                    tracing::info!("stopping clipboard monitor: {err}");
+                    return Ok(());
+                }
+            }
+            Ok(_) => {}
+            Err(err) => tracing::warn!("clipboard monitor poll error: {err}"),
         }
     }
 
+    tracing::info!("clipboard monitor stopped");
     Ok(())
 }
 
@@ -159,6 +215,9 @@ impl SeatData {
     }
 
     fn set_clipboard_offer(&mut self, offer: Option<ZwlrDataControlOfferV1>) {
+        if self.clipboard_offer.as_ref() == offer.as_ref() {
+            return;
+        }
         if let Some(old) = self.clipboard_offer.take() {
             old.destroy();
         }
@@ -166,6 +225,9 @@ impl SeatData {
     }
 
     fn set_primary_offer(&mut self, offer: Option<ZwlrDataControlOfferV1>) {
+        if self.primary_offer.as_ref() == offer.as_ref() {
+            return;
+        }
         if let Some(old) = self.primary_offer.take() {
             old.destroy();
         }
@@ -238,10 +300,16 @@ impl State {
     }
 
     fn schedule_selection(&mut self, source: SelectionSource, offer: ZwlrDataControlOfferV1) {
+        let has_text_mime = self
+            .offers
+            .get(&offer)
+            .and_then(text_plain_mime)
+            .is_some();
         self.pending = Some(PendingSelection {
             source,
             offer,
             changed_at: Instant::now(),
+            has_text_mime,
         });
     }
 
@@ -259,15 +327,36 @@ impl State {
             return Ok(());
         }
 
+        let has_text_mime = pending.has_text_mime
+            || self
+                .offers
+                .get(&pending.offer)
+                .and_then(text_plain_mime)
+                .is_some();
+        if !has_text_mime {
+            return Ok(());
+        }
+
         let pending = self.pending.take().expect("pending selection");
         let Some(payload) = read_text_plain(queue, self, &pending.offer)? else {
+            self.pending = Some(PendingSelection {
+                has_text_mime: true,
+                ..pending
+            });
             return Ok(());
         };
 
         let text = match std::str::from_utf8(&payload) {
             Ok(text) => text,
-            Err(_) => return Ok(()),
+            Err(err) => {
+                tracing::warn!("clipboard payload is not valid UTF-8: {err}");
+                return Ok(());
+            }
         };
+
+        if text.is_empty() {
+            return Ok(());
+        }
 
         let fingerprint = text_checksum(text);
         if self
@@ -279,6 +368,9 @@ impl State {
             tracing::debug!("ignoring self-copy clipboard notification");
             return Ok(());
         }
+
+        let preview: String = text.chars().take(48).collect();
+        tracing::info!(bytes = payload.len(), %preview, "clipboard captured");
 
         let event = ClipboardEvent {
             source: pending.source,
@@ -301,17 +393,33 @@ impl State {
     }
 }
 
+fn text_plain_mime(types: &HashSet<String>) -> Option<String> {
+    for candidate in [
+        "text/plain;charset=utf-8",
+        "text/plain",
+        "TEXT",
+        "STRING",
+        "UTF8_STRING",
+    ] {
+        if types.contains(candidate) {
+            return Some(candidate.to_owned());
+        }
+    }
+    types
+        .iter()
+        .find(|mime| mime.starts_with("text/plain"))
+        .cloned()
+}
+
 fn read_text_plain(
     queue: &mut EventQueue<State>,
     state: &mut State,
     offer: &ZwlrDataControlOfferV1,
 ) -> Result<Option<Vec<u8>>, MonitorError> {
-    let mime_types = match state.offers.get(offer) {
-        Some(types) if types.contains("text/plain") => types,
-        _ => return Ok(None),
+    let mime_type = match state.offers.get(offer).and_then(text_plain_mime) {
+        Some(mime_type) => mime_type,
+        None => return Ok(None),
     };
-
-    let _ = mime_types;
 
     let (mut reader, writer) = std::io::pipe().map_err(|err| {
         MonitorError::Dispatch(wayland_client::DispatchError::Backend(
@@ -319,25 +427,68 @@ fn read_text_plain(
         ))
     })?;
 
-    offer.receive("text/plain".to_string(), writer.as_fd());
+    let flags = fcntl_getfl(&reader).map_err(errno_to_dispatch_err)?;
+    fcntl_setfl(&reader, flags | OFlags::NONBLOCK).map_err(errno_to_dispatch_err)?;
+
+    offer.receive(mime_type, writer.as_fd());
     drop(writer);
 
-    for _ in 0..8 {
-        queue.blocking_dispatch(state)?;
-    }
-
+    let deadline = Instant::now() + Duration::from_millis(500);
     let mut payload = Vec::new();
-    reader.read_to_end(&mut payload).map_err(|err| {
-        MonitorError::Dispatch(wayland_client::DispatchError::Backend(
-            wayland_client::backend::WaylandError::Io(err),
-        ))
-    })?;
+    let mut buf = [0u8; 4096];
 
-    if payload.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(payload))
+    while Instant::now() < deadline {
+        while queue.dispatch_pending(state)? > 0 {}
+
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => payload.extend_from_slice(&buf[..n]),
+                Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(err) => return Err(io_to_dispatch_err(err)),
+            }
+        }
+
+        if !payload.is_empty() {
+            return Ok(Some(payload));
+        }
+
+        queue.flush().map_err(|err| {
+            MonitorError::Dispatch(wayland_client::DispatchError::Backend(err))
+        })?;
+
+        let Some(read_guard) = queue.prepare_read() else {
+            std::thread::sleep(Duration::from_millis(10));
+            continue;
+        };
+
+        let fd = read_guard.connection_fd();
+        let mut poll_fds = [PollFd::from_borrowed_fd(fd, PollFlags::IN)];
+        match poll(&mut poll_fds, 50) {
+            Ok(0) => {}
+            Ok(_) if poll_fds[0].revents().contains(PollFlags::IN) => {
+                if let Err(err) = read_guard.read() {
+                    return Err(MonitorError::Dispatch(wayland_client::DispatchError::Backend(
+                        err,
+                    )));
+                }
+            }
+            Ok(_) => {}
+            Err(err) => tracing::warn!("clipboard read poll error: {err}"),
+        }
     }
+
+    Ok(None)
+}
+
+fn io_to_dispatch_err(err: std::io::Error) -> MonitorError {
+    MonitorError::Dispatch(wayland_client::DispatchError::Backend(
+        wayland_client::backend::WaylandError::Io(err),
+    ))
+}
+
+fn errno_to_dispatch_err(err: rustix::io::Errno) -> MonitorError {
+    io_to_dispatch_err(std::io::Error::from(err))
 }
 
 fn unix_now() -> u64 {
@@ -403,11 +554,25 @@ impl Dispatch<ZwlrDataControlDeviceV1, WlSeat> for State {
 
         match event {
             zwlr_data_control_device_v1::Event::DataOffer { id } => {
+                tracing::debug!(offer_id = ?id.id(), "clipboard data offer");
                 state.offers.insert(id, HashSet::new());
             }
             zwlr_data_control_device_v1::Event::Selection { id } => {
+                tracing::info!(
+                    offer = ?id.as_ref().map(|offer| offer.id()),
+                    "clipboard selection changed"
+                );
+                let same_offer = state.pending.as_ref().is_some_and(|pending| {
+                    id.as_ref()
+                        .is_some_and(|offer| pending.offer.id() == offer.id())
+                });
+                if !same_offer {
+                    state.pending = None;
+                }
                 data.set_clipboard_offer(id.clone());
-                if let Some(offer) = id {
+                if let Some(offer) = id
+                    && !same_offer
+                {
                     state.schedule_selection(SelectionSource::Clipboard, offer);
                 }
             }
@@ -446,7 +611,14 @@ impl Dispatch<ZwlrDataControlOfferV1, ()> for State {
         if let zwlr_data_control_offer_v1::Event::Offer { mime_type } = event
             && let Some(types) = state.offers.get_mut(offer)
         {
+            tracing::debug!(offer_id = ?offer.id(), %mime_type, "clipboard offer mime");
             types.insert(mime_type);
+            if let Some(pending) = state.pending.as_mut()
+                && pending.offer == *offer
+                && text_plain_mime(types).is_some()
+            {
+                pending.has_text_mime = true;
+            }
         }
     }
 }

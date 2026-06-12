@@ -1,6 +1,6 @@
 # STATE — cosmic-paste
 
-Last updated: 2026-06-13
+Last updated: 2026-06-13 (MVP: clipboard capture + panel applet working)
 
 **Design:** [`docs/DESIGN.md`](DESIGN.md)
 
@@ -22,10 +22,43 @@ GPaste-inspired clipboard manager for COSMIC (libcosmic native, daemon-centric).
 - **PR 4 follow-up** — `Select` / `SelectAtOffset` clipboard write-back (wlr-data-control), `Update` + `ActiveIndexChanged` on clipboard ingest; review cleanup (write-first + rollback, guard window, stale sources)
 - **PR 6** — `settings.rs` + cosmic_config hot-reload, `track_applet_state`, history policy mapping, 40 tests (35 core + 5 daemon)
 
+- **PR 7a** — ashpd GlobalShortcuts spike (`show-history`), `PortalShortcutsAvailable` property, `just test-portal`, 41 tests
+- **PR 10** — `cosmic-paste` CLI: `history`, `select`, `add`, `prev`/`next`, `track`, `show-history`, `version`, `empty`, `daemon-reexec`; exit codes 0/1/2/3
+- **PR 8 (MVP)** — panel applet: icon + tooltip (`N/count: preview`), click popup with history list, DBus signal subscription, `OnAppletStateChanged`, desktop + dbus service files; `just install-user` installs applet
+- **ShowHistory (partial)** — daemon emits signal when applet present; portal spike + CLI `show-history` wired
+- **MVP milestone** — real clipboard capture (Ctrl+C), history ingest, panel tooltip counter, tray popup; monitor fix (non-blocking offer read, offer lifecycle, systemd `ImportEnvironment`)
+
+## Shortcuts (today)
+
+**Daemon global shortcuts (PR 7a only):** only `show-history` is registered via the XDG GlobalShortcuts portal. On many COSMIC builds the portal is missing (`PortalShortcutsAvailable=false`); use COSMIC Settings custom shortcuts or CLI instead.
+
+**Default accelerators** (GTK-style, in `settings.shortcuts` — used when PR 7 lands):
+
+| Setting key | Default | Action |
+|-------------|---------|--------|
+| `show_history` | `<Ctrl><Alt>H` | Open history popup |
+| `launch_ui` | `<Ctrl><Alt>G` | Full history window (not built yet) |
+| `select_previous` | `<Ctrl><Alt>Up` | Older item (`SelectAtOffset +1`) |
+| `select_next` | `<Ctrl><Alt>Down` | Newer item (`SelectAtOffset -1`) |
+| `pop` | `<Ctrl><Alt>V` | Pop top item |
+| `quick_select_0`…`_9` | *(empty)* | Opt-in quick pick |
+
+**Works now via CLI** (bind in **Settings → Keyboard → Custom shortcuts** with `Spawn("…")`):
+
+| Command | Effect |
+|---------|--------|
+| `cosmic-paste prev` | Newer history item + paste to clipboard |
+| `cosmic-paste next` | Older history item + paste to clipboard |
+| `cosmic-paste show-history` | Open panel popup (applet must be in panel) |
+
+Example F9–F12 bindings: see `data/examples/cosmic-custom-shortcuts.ron` and `just show-cosmic-shortcuts`.
+
 ## Next
 
-1. **PR 7a** — ashpd GlobalShortcuts proof-of-life
-2. **PR 4 follow-up (optional)** — ext-data-control fallback for compositors without wlr-data-control
+1. **PR 7** — full shortcut table (prev/next/show-history/launch-ui) + ShowHistory fallback chain
+2. **PR 7b** — minimal `cosmic-paste-ui --popup` for ShowHistory fallback when applet absent
+3. **PR 9** — applet pagination, keyboard nav, Ctrl+overlay
+4. **PR 4 follow-up (optional)** — ext-data-control fallback for compositors without wlr-data-control
 
 ## Key decisions (locked)
 

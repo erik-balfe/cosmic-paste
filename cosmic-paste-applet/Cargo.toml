@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "cosmic-paste panel applet (stub — PR 8)"
+description = "cosmic-paste panel applet"
 publish = false
 
 [[bin]]
@@ -13,3 +13,10 @@ path = "src/main.rs"
 
 [dependencies]
 cosmic-paste-core = { workspace = true }
+futures-util = { workspace = true }
+libcosmic = { git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+    "applet-token",
+] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tracing = { workspace = true }
+zbus = { workspace = true }

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "cosmic-paste command-line client (stub — PR 10)"
+description = "cosmic-paste command-line client"
 publish = false
 
 [[bin]]
@@ -12,4 +12,7 @@ name = "cosmic-paste"
 path = "src/main.rs"
 
 [dependencies]
+clap = { workspace = true }
 cosmic-paste-core = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util"] }
+zbus = { workspace = true }

@@ -33,8 +33,11 @@ impl DaemonState {
             applet_present: false,
             portal_shortcuts_available: false,
             clipboard_write: None,
-            store: HistoryStore::new(DataPaths::new(std::env::temp_dir().join("cosmic-paste-test"))),
+            store: HistoryStore::new(DataPaths::new(
+                std::env::temp_dir().join(format!("cosmic-paste-test-{}", std::process::id())),
+            )),
         };
+        let _ = state.store.ensure_dirs();
         state.apply_settings();
         state
     }

@@ -2,6 +2,7 @@ mod config;
 mod ingest;
 mod lifecycle;
 mod monitor;
+mod shortcuts;
 mod signals;
 
 use cosmic_paste_core::dbus::clipboard::WRITE_QUEUE_DEPTH;
@@ -29,6 +30,7 @@ async fn main() {
     daemon.set_clipboard_writer(clipboard_write_tx);
 
     let watch_primary = daemon.settings.primary_to_history;
+    let show_history_accel = daemon.settings.shortcuts.show_history.clone();
 
     let (lifecycle, lifecycle_rx) = LifecycleHandle::pair();
     let service = daemon.service(lifecycle);
@@ -43,10 +45,16 @@ async fn main() {
     let monitor_config = monitor.shared_config();
     let _config_watcher = config::spawn_config_watcher(shared.clone(), monitor_config);
     let monitor_handle = monitor.spawn(clipboard_tx, clipboard_write_rx);
+    let portal_signal_tx = signal_tx.clone();
     tokio::spawn(ingest::run_ingest_loop(
         clipboard_rx,
         shared.clone(),
         Some(signal_tx),
+    ));
+    tokio::spawn(shortcuts::run_portal_spike(
+        shared.clone(),
+        show_history_accel,
+        portal_signal_tx,
     ));
 
     let connection = match zbus::connection::Builder::session() {
@@ -79,7 +87,7 @@ async fn main() {
     flush_state(&shared).await;
     drop(connection);
     signal_task.abort();
-    monitor_handle.join();
+    monitor_handle.shutdown();
 
     if shutdown == ShutdownReason::Reexecute {
         info!("reexecuting cosmic-paste-daemon");

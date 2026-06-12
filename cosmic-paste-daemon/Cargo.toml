@@ -12,16 +12,21 @@ name = "cosmic-paste-daemon"
 path = "src/main.rs"
 
 [dependencies]
+ashpd = { workspace = true }
 cosmic-paste-core = { workspace = true }
+futures-util = { workspace = true }
 notify = "8"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-journald = { workspace = true }
 tracing-subscriber = { workspace = true }
+rustix = { version = "0.38", features = ["event", "fs"] }
 wayland-client = { workspace = true }
 wayland-protocols-wlr = { workspace = true }
 zbus = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+ashpd = { workspace = true }
+futures-util = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
