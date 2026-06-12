@@ -1,0 +1,139 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node>
+  <interface name="org.system76.CosmicPaste2">
+    <method name="Add">
+      <arg type="s" name="text" direction="in"/>
+    </method>
+    <method name="AddFile">
+      <arg type="s" name="file" direction="in"/>
+    </method>
+    <method name="AddPassword">
+      <arg type="s" name="name" direction="in"/>
+      <arg type="s" name="password" direction="in"/>
+    </method>
+    <method name="BackupHistory">
+      <arg type="s" name="history" direction="in"/>
+      <arg type="s" name="backup" direction="in"/>
+    </method>
+    <method name="Delete">
+      <arg type="s" name="uuid" direction="in"/>
+    </method>
+    <method name="DeleteHistory">
+      <arg type="s" name="name" direction="in"/>
+    </method>
+    <method name="DeletePassword">
+      <arg type="s" name="name" direction="in"/>
+    </method>
+    <method name="EmptyHistory">
+      <arg type="s" name="name" direction="in"/>
+    </method>
+    <method name="GetElement">
+      <arg type="s" name="uuid" direction="in"/>
+      <arg type="s" name="value" direction="out"/>
+    </method>
+    <method name="GetElementAtIndex">
+      <arg type="t" name="index" direction="in"/>
+      <arg type="s" name="uuid" direction="out"/>
+      <arg type="s" name="value" direction="out"/>
+    </method>
+    <method name="GetElementKind">
+      <arg type="s" name="uuid" direction="in"/>
+      <arg type="s" name="kind" direction="out"/>
+    </method>
+    <method name="GetElements">
+      <arg type="as" name="uuids" direction="in"/>
+      <arg type="a(ss)" name="elements" direction="out"/>
+    </method>
+    <method name="GetHistory">
+      <arg type="a(ss)" name="history" direction="out"/>
+    </method>
+    <method name="GetHistoryName">
+      <arg type="s" name="name" direction="out"/>
+    </method>
+    <method name="GetHistorySize">
+      <arg type="s" name="name" direction="in"/>
+      <arg type="t" name="size" direction="out"/>
+    </method>
+    <method name="GetRawElement">
+      <arg type="s" name="uuid" direction="in"/>
+      <arg type="s" name="value" direction="out"/>
+    </method>
+    <method name="GetRawHistory">
+      <arg type="a(ss)" name="history" direction="out"/>
+    </method>
+    <method name="ListHistories">
+      <arg type="as" name="histories" direction="out"/>
+    </method>
+    <method name="Merge">
+      <arg type="s" name="decoration" direction="in"/>
+      <arg type="s" name="separator" direction="in"/>
+      <arg type="as" name="uuids" direction="in"/>
+    </method>
+    <method name="RenamePassword">
+      <arg type="s" name="old_name" direction="in"/>
+      <arg type="s" name="new_name" direction="in"/>
+    </method>
+    <method name="Replace">
+      <arg type="s" name="uuid" direction="in"/>
+      <arg type="s" name="contents" direction="in"/>
+    </method>
+    <method name="Search">
+      <arg type="s" name="query" direction="in"/>
+      <arg type="as" name="results" direction="out"/>
+    </method>
+    <method name="Select">
+      <arg type="s" name="uuid" direction="in"/>
+    </method>
+    <method name="SetPassword">
+      <arg type="s" name="uuid" direction="in"/>
+      <arg type="s" name="name" direction="in"/>
+    </method>
+    <method name="SwitchHistory">
+      <arg type="s" name="name" direction="in"/>
+    </method>
+    <method name="Track">
+      <arg type="b" name="tracking_state" direction="in"/>
+    </method>
+    <method name="ShowHistory"/>
+    <method name="Reexecute"/>
+    <method name="About"/>
+    <method name="OnAppletStateChanged">
+      <arg type="b" name="state" direction="in"/>
+    </method>
+    <method name="SelectAtOffset">
+      <arg type="i" name="offset" direction="in"/>
+      <arg type="s" name="uuid" direction="out"/>
+    </method>
+    <method name="GetActiveIndex">
+      <arg type="t" name="index" direction="out"/>
+    </method>
+    <method name="SetActiveIndex">
+      <arg type="t" name="index" direction="in"/>
+    </method>
+    <signal name="Update">
+      <arg type="s" name="action"/>
+      <arg type="s" name="target"/>
+      <arg type="t" name="index"/>
+    </signal>
+    <signal name="ShowHistory"/>
+    <signal name="SwitchHistory">
+      <arg type="s" name="history"/>
+    </signal>
+    <signal name="EmptyHistory">
+      <arg type="s" name="history"/>
+    </signal>
+    <signal name="DeleteHistory">
+      <arg type="s" name="history"/>
+    </signal>
+    <signal name="ActiveIndexChanged">
+      <arg type="t" name="index"/>
+      <arg type="t" name="count"/>
+    </signal>
+    <property name="Active" type="b" access="read"/>
+    <property name="Version" type="s" access="read"/>
+    <property name="ActiveIndex" type="t" access="read"/>
+    <property name="AppletPresent" type="b" access="read"/>
+    <property name="PortalShortcutsAvailable" type="b" access="read"/>
+  </interface>
+</node>

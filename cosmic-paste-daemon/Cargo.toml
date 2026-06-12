@@ -1,0 +1,19 @@
+[package]
+name = "cosmic-paste-daemon"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "cosmic-paste background daemon (stub — PR 3+)"
+publish = false
+
+[[bin]]
+name = "cosmic-paste-daemon"
+path = "src/main.rs"
+
+[dependencies]
+cosmic-paste-core = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+zbus = { workspace = true }

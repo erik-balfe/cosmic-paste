@@ -1,0 +1,15 @@
+[package]
+name = "cosmic-paste-applet"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "cosmic-paste panel applet (stub — PR 8)"
+publish = false
+
+[[bin]]
+name = "cosmic-paste-applet"
+path = "src/main.rs"
+
+[dependencies]
+cosmic-paste-core = { workspace = true }

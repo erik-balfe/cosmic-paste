@@ -1,0 +1,1 @@
+/home/erik/AGENTS.md

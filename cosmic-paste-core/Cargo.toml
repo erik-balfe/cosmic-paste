@@ -1,0 +1,23 @@
+[package]
+name = "cosmic-paste-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Core types and history logic for cosmic-paste"
+publish = false
+
+[dependencies]
+dirs = { workspace = true }
+ron = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"
+thiserror = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+zbus = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = "1"
+tempfile = "3"
