@@ -13,3 +13,8 @@ Icon=com.system76.CosmicPaste.Applet-symbolic
 X-CosmicApplet=true
 X-HostWaylandDisplay=true
 X-CosmicHoverPopup=End
+Actions=show-history;
+
+[Desktop Action show-history]
+Name=Show Clipboard History
+Exec=@bindir@/cosmic-paste-applet --show-history %u

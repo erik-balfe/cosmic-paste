@@ -17,6 +17,8 @@ pub trait CosmicPaste {
 
     async fn select_at_offset(&self, offset: i32) -> zbus::Result<String>;
 
+    async fn select_at_index(&self, index: u32) -> zbus::Result<String>;
+
     async fn select(&self, uuid: &str) -> zbus::Result<()>;
 
     async fn track(&self, tracking_state: bool) -> zbus::Result<()>;

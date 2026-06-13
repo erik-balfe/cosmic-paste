@@ -261,9 +261,19 @@ async fn cmd_offset(offset: i32) -> Result<()> {
 }
 
 async fn cmd_show_history() -> Result<()> {
+    cosmic_paste_core::show_history_trigger::signal();
+    cosmic_paste_core::dbus::applet_activation::activate_show_history().await;
+
     let connection = session().await?;
     let proxy = proxy(&connection).await?;
+    let applet_present = proxy.applet_present().await.map_err(map_method_error)?;
     proxy.show_history().await.map_err(map_method_error)?;
+    if !applet_present {
+        eprintln!(
+            "ShowHistory sent, but the panel applet is not active.\n\
+             Add COSMIC Paste in Settings → Desktop → Panel → Applets, then restart cosmic-panel."
+        );
+    }
     Ok(())
 }
 

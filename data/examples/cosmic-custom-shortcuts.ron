@@ -1,26 +1,26 @@
-// Merge these entries into:
-//   ~/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom
-// via Settings → Keyboard → Custom shortcuts, or paste into the RON map.
+// GlobalShortcuts portal is not available on all COSMIC builds — use these
+// COSMIC Settings custom shortcuts (Settings → Keyboard → Custom shortcuts).
 //
-// Index 0 = newest clipboard item. `prev` = newer, `next` = older.
+// Merge into:
+//   ~/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom
+//
+// GNOME Clipboard Indicator defaults: Ctrl+F9 toggle menu, Ctrl+F11 prev, Ctrl+F12 next.
+// cosmic-paste maps the same chords when the portal is unavailable.
+//
+// Prefer the show-history helper (sync gdbus + unix socket) over plain CLI for F9/F11 menu.
 
 (
     modifiers: [Ctrl],
     key: "F9",
-    description: Some("cosmic-paste: newer item"),
-): Spawn("cosmic-paste prev"),
-(
-    modifiers: [Ctrl],
-    key: "F10",
-    description: Some("cosmic-paste: older item"),
-): Spawn("cosmic-paste next"),
+    description: Some("cosmic-paste: open history popup"),
+): Spawn("@bindir@/cosmic-paste-show-history"),
 (
     modifiers: [Ctrl],
     key: "F11",
-    description: Some("cosmic-paste: history popup"),
-): Spawn("cosmic-paste show-history"),
+    description: Some("cosmic-paste: newer item"),
+): Spawn("@bindir@/cosmic-paste prev"),
 (
     modifiers: [Ctrl],
     key: "F12",
-    description: Some("cosmic-paste: history popup"),
-): Spawn("cosmic-paste show-history"),
+    description: Some("cosmic-paste: older item"),
+): Spawn("@bindir@/cosmic-paste next"),

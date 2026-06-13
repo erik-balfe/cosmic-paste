@@ -12,6 +12,9 @@ use rustix::event::{poll, PollFd, PollFlags};
 use rustix::fs::{fcntl_getfl, fcntl_setfl, OFlags};
 
 use cosmic_paste_core::dbus::clipboard::WRITE_TIMEOUT;
+
+/// How long to wait for compositor `Send` before acknowledging the DBus caller.
+const TRANSFER_WAIT: Duration = Duration::from_millis(400);
 use cosmic_paste_core::dbus::ClipboardWriteRequest;
 use cosmic_paste_core::item::text_checksum;
 use tokio::sync::mpsc as async_mpsc;
@@ -27,7 +30,17 @@ use wayland_protocols_wlr::data_control::v1::client::{
     zwlr_data_control_source_v1::{self, ZwlrDataControlSourceV1},
 };
 
-use super::{ClipboardEvent, MonitorConfig, SelectionSource, SelfCopyGuard};
+use cosmic_paste_core::dbus::SharedSelfCopyGuard;
+
+use super::{ClipboardEvent, MonitorConfig, SelectionSource};
+
+const CLIPBOARD_WRITE_MIMES: &[&str] = &[
+    "text/plain;charset=utf-8",
+    "text/plain",
+    "UTF8_STRING",
+    "STRING",
+    "TEXT",
+];
 
 #[derive(Debug, thiserror::Error)]
 pub enum MonitorError {
@@ -68,7 +81,7 @@ struct State {
     sources: HashMap<ZwlrDataControlSourceV1, SourcePayload>,
     pending: Option<PendingSelection>,
     config: Arc<Mutex<MonitorConfig>>,
-    guard: Arc<Mutex<SelfCopyGuard>>,
+    guard: SharedSelfCopyGuard,
     tx: async_mpsc::Sender<ClipboardEvent>,
     write_rx: mpsc::Receiver<ClipboardWriteRequest>,
 }
@@ -77,7 +90,7 @@ pub fn run(
     tx: async_mpsc::Sender<ClipboardEvent>,
     write_rx: mpsc::Receiver<ClipboardWriteRequest>,
     config: Arc<Mutex<MonitorConfig>>,
-    guard: Arc<Mutex<SelfCopyGuard>>,
+    guard: SharedSelfCopyGuard,
     shutdown: Arc<AtomicBool>,
 ) -> Result<(), MonitorError> {
     let conn = Connection::connect_to_env()?;
@@ -140,9 +153,10 @@ pub fn run(
 
     while !shutdown.load(Ordering::Relaxed) {
         state.expire_stale_sources();
-        state.process_write_requests(&qh)?;
+        state.process_write_requests(&qh, &mut queue)?;
 
         while queue.dispatch_pending(&mut state)? > 0 {
+            state.process_write_requests(&qh, &mut queue)?;
             if let Err(err) = state.flush_pending(&mut queue) {
                 tracing::info!("stopping clipboard monitor: {err}");
                 return Ok(());
@@ -178,6 +192,7 @@ pub fn run(
                     )));
                 }
                 while queue.dispatch_pending(&mut state)? > 0 {
+                    state.process_write_requests(&qh, &mut queue)?;
                     if let Err(err) = state.flush_pending(&mut queue) {
                         tracing::info!("stopping clipboard monitor: {err}");
                         return Ok(());
@@ -245,18 +260,25 @@ impl State {
             .collect();
 
         for source in stale {
-            self.fail_source(&source, "clipboard write timed out");
+            tracing::debug!("expiring stale clipboard write source");
+            self.drop_source(&source);
         }
     }
 
-    fn process_write_requests(&mut self, qh: &QueueHandle<Self>) -> Result<(), MonitorError> {
+    fn process_write_requests(
+        &mut self,
+        qh: &QueueHandle<Self>,
+        queue: &mut EventQueue<State>,
+    ) -> Result<(), MonitorError> {
         while let Ok(request) = self.write_rx.try_recv() {
             if let Ok(mut guard) = self.guard.lock() {
                 guard.arm(request.fingerprint);
             }
 
             let source = self.manager.create_data_source(qh, ());
-            source.offer("text/plain".to_string());
+            for mime in CLIPBOARD_WRITE_MIMES {
+                source.offer((*mime).to_string());
+            }
             self.sources.insert(
                 source.clone(),
                 SourcePayload {
@@ -266,18 +288,91 @@ impl State {
                 },
             );
 
-            let Some((_, seat_data)) = self.seats.first() else {
-                self.fail_source(&source, "no Wayland seat available");
-                continue;
-            };
-            let Some(device) = seat_data.device.as_ref() else {
-                self.fail_source(&source, "data-control device unavailable");
+            let device = self
+                .seats
+                .first()
+                .and_then(|(_, seat_data)| seat_data.device.as_ref().cloned());
+            let Some(device) = device else {
+                self.fail_source(
+                    &source,
+                    if self.seats.is_empty() {
+                        "no Wayland seat available"
+                    } else {
+                        "data-control device unavailable"
+                    },
+                );
                 continue;
             };
 
+            queue.roundtrip(self).map_err(MonitorError::Dispatch)?;
             device.set_selection(Some(&source));
+            queue.flush().map_err(|err| {
+                MonitorError::Dispatch(wayland_client::DispatchError::Backend(err))
+            })?;
+
             tracing::debug!(bytes = self.sources[&source].data.len(), "posted clipboard write");
+            self.wait_for_source_transfer(queue, &source, TRANSFER_WAIT)?;
+
+            // cosmic-comp may apply the selection before Send; acknowledge once posted.
+            if let Some(payload) = self.sources.get_mut(&source)
+                && let Some(reply) = payload.reply.take()
+            {
+                let _ = reply.send(Ok(()));
+            }
         }
+        Ok(())
+    }
+
+    fn drop_source(&mut self, source: &ZwlrDataControlSourceV1) {
+        self.sources.remove(source);
+        source.destroy();
+    }
+
+    fn wait_for_source_transfer(
+        &mut self,
+        queue: &mut EventQueue<State>,
+        source: &ZwlrDataControlSourceV1,
+        timeout: Duration,
+    ) -> Result<(), MonitorError> {
+        let deadline = Instant::now() + timeout;
+        while self.sources.contains_key(source) && Instant::now() < deadline {
+            while queue.dispatch_pending(self)? > 0 {}
+
+            queue.flush().map_err(|err| {
+                MonitorError::Dispatch(wayland_client::DispatchError::Backend(err))
+            })?;
+
+            if !self.sources.contains_key(source) {
+                return Ok(());
+            }
+
+            let Some(read_guard) = queue.prepare_read() else {
+                std::thread::sleep(Duration::from_millis(5));
+                continue;
+            };
+
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            let timeout_ms = remaining.as_millis().min(50) as i32;
+            if timeout_ms == 0 {
+                continue;
+            }
+
+            let fd = read_guard.connection_fd();
+            let mut poll_fds = [PollFd::from_borrowed_fd(fd, PollFlags::IN)];
+            match poll(&mut poll_fds, timeout_ms) {
+                Ok(0) => {}
+                Ok(_) if poll_fds[0].revents().contains(PollFlags::IN) => {
+                    if let Err(err) = read_guard.read() {
+                        return Err(MonitorError::Dispatch(wayland_client::DispatchError::Backend(
+                            err,
+                        )));
+                    }
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!("clipboard write poll error: {err}"),
+            }
+        }
+
         Ok(())
     }
 
@@ -286,15 +381,6 @@ impl State {
             && let Some(reply) = payload.reply
         {
             let _ = reply.send(Err(message.to_owned()));
-        }
-        source.destroy();
-    }
-
-    fn complete_source(&mut self, source: &ZwlrDataControlSourceV1, result: Result<(), String>) {
-        if let Some(payload) = self.sources.remove(source)
-            && let Some(reply) = payload.reply
-        {
-            let _ = reply.send(result);
         }
         source.destroy();
     }
@@ -359,13 +445,11 @@ impl State {
         }
 
         let fingerprint = text_checksum(text);
-        if self
-            .guard
-            .lock()
-            .ok()
-            .is_some_and(|guard| guard.should_ignore(fingerprint))
+        if let Ok(mut guard) = self.guard.lock()
+            && guard.should_suppress_ingest(fingerprint)
         {
-            tracing::debug!("ignoring self-copy clipboard notification");
+            tracing::debug!("suppressing clipboard notification during pending write");
+            guard.clear_if_matched(fingerprint);
             return Ok(());
         }
 
@@ -391,6 +475,12 @@ impl State {
 
         Ok(())
     }
+}
+
+fn is_text_transfer_mime(mime_type: &str) -> bool {
+    mime_type == "text/plain"
+        || mime_type.starts_with("text/plain")
+        || matches!(mime_type, "UTF8_STRING" | "STRING" | "TEXT")
 }
 
 fn text_plain_mime(types: &HashSet<String>) -> Option<String> {
@@ -438,7 +528,9 @@ fn read_text_plain(
     let mut buf = [0u8; 4096];
 
     while Instant::now() < deadline {
-        while queue.dispatch_pending(state)? > 0 {}
+        while queue.dispatch_pending(state)? > 0 {
+            state.process_write_requests(&queue.handle(), queue)?;
+        }
 
         loop {
             match reader.read(&mut buf) {
@@ -634,10 +726,10 @@ impl Dispatch<ZwlrDataControlSourceV1, ()> for State {
     ) {
         match event {
             zwlr_data_control_source_v1::Event::Send { mime_type, fd } => {
-                if mime_type != "text/plain" {
-                    state.complete_source(
+                if !is_text_transfer_mime(&mime_type) {
+                    state.fail_source(
                         source,
-                        Err(format!("unexpected clipboard mime type: {mime_type}")),
+                        &format!("unexpected clipboard mime type: {mime_type}"),
                     );
                     return;
                 }
@@ -654,10 +746,15 @@ impl Dispatch<ZwlrDataControlSourceV1, ()> for State {
                 })()
                 .map_err(|err: std::io::Error| err.to_string());
 
-                state.complete_source(source, result);
+                tracing::debug!(%mime_type, bytes = data.len(), "clipboard write transfer");
+                if let Err(err) = result {
+                    state.fail_source(source, &err);
+                } else {
+                    state.drop_source(source);
+                }
             }
             zwlr_data_control_source_v1::Event::Cancelled => {
-                state.complete_source(source, Err("clipboard transfer cancelled".into()));
+                state.fail_source(source, "clipboard transfer cancelled");
             }
             _ => {}
         }

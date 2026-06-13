@@ -1046,6 +1046,7 @@ dependencies = [
  "cosmic-paste-core",
  "futures-util",
  "libcosmic",
+ "notify",
  "tokio",
  "tracing",
  "zbus",

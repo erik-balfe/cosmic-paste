@@ -141,7 +141,7 @@ impl History {
         }
 
         let mut item = HistoryItem::new_text(prepared, rich, created_at);
-        item.display = crate::item::truncate_display(
+        item.display = crate::item::format_display_line(
             item.plain_text().unwrap_or_default(),
             self.policies.element_display_size,
         );
@@ -217,7 +217,7 @@ impl History {
                         + r.xml.as_ref().map(|s| s.len()).unwrap_or(0)
                 })
                 .unwrap_or(0) as u64;
-        let display = crate::item::truncate_display(new_text, self.policies.element_display_size);
+        let display = crate::item::format_display_line(new_text, self.policies.element_display_size);
 
         self.byte_total = self
             .byte_total

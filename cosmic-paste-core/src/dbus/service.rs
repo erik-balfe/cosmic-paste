@@ -1,13 +1,12 @@
-use std::sync::Arc;
-
 use zbus::interface;
 use zbus::object_server::SignalEmitter;
 
-use super::clipboard::write_clipboard;
+use super::clipboard::write_clipboard_for_paste;
 use super::lifecycle::{LifecycleHandle, ShutdownReason};
 use super::state::SharedDaemonState;
 use super::{element_value, item_kind_name, parse_uuid, VERSION};
 use crate::error::Error;
+use crate::selection_status::show_selection_toast;
 use crate::History;
 
 fn unix_now() -> u64 {
@@ -37,7 +36,23 @@ fn history_entries(history: &History) -> Vec<(String, String)> {
     history
         .items()
         .iter()
-        .map(|item| (item.uuid.to_string(), item.display.clone()))
+        .map(|item| {
+            let preview = item
+                .plain_text()
+                .map(|text| {
+                    crate::item::format_display_line_middle(
+                        text,
+                        history.policies().element_display_size,
+                    )
+                })
+                .unwrap_or_else(|| {
+                    crate::item::format_display_line_middle(
+                        &item.display,
+                        history.policies().element_display_size,
+                    )
+                });
+            (item.uuid.to_string(), preview)
+        })
         .collect()
 }
 
@@ -112,7 +127,13 @@ impl CosmicPasteService {
     }
 
     async fn get_history(&self) -> zbus::fdo::Result<Vec<(String, String)>> {
-        self.with_state(|state| Ok(history_entries(state.history()))).await
+        self.with_state(|state| {
+            let limit = state.settings.max_displayed_history_size as usize;
+            let mut entries = history_entries(state.history());
+            entries.truncate(limit);
+            Ok(entries)
+        })
+        .await
     }
 
     async fn get_active_index(&self) -> zbus::fdo::Result<u32> {
@@ -171,6 +192,59 @@ impl CosmicPasteService {
                 .await;
             return Err(err);
         }
+
+        show_selection_toast(index, count, &text);
+        Self::emit_active_index_changed(emitter.clone(), index, count).await?;
+
+        let shared = self.state.clone();
+        tokio::spawn(async move {
+            let guard = shared.lock().await;
+            if let Err(err) = guard.persist() {
+                tracing::warn!("failed to persist navigation state: {err}");
+            }
+        });
+
+        Self::update(emitter, "select", &uuid, index).await?;
+        Ok(uuid)
+    }
+
+    async fn select_at_index(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        index: u32,
+    ) -> zbus::fdo::Result<String> {
+        let (uuid, text, index, count, rollback) = self
+            .with_state(|state| {
+                let rollback = state.session.clone();
+                let history_len = state.history().len();
+                let index = state
+                    .session_mut()
+                    .active_index
+                    .set_active_index(index as usize, history_len)
+                    .map_err(map_error)?;
+                let item = state
+                    .history()
+                    .get(index)
+                    .ok_or_else(|| {
+                        zbus::fdo::Error::Failed("failed to read selected item".into())
+                    })?;
+                let uuid = item.uuid.to_string();
+                let text = element_value(item);
+                Ok((uuid, text, index as u32, history_len as u32, rollback))
+            })
+            .await?;
+
+        if let Err(err) = self.write_clipboard_text(&text).await {
+            let _ = self
+                .with_state(|state| {
+                    state.session = rollback;
+                    Ok(())
+                })
+                .await;
+            return Err(err);
+        }
+
+        show_selection_toast(index, count, &text);
 
         self.with_state(|state| {
             state.persist().map_err(|e| {
@@ -433,12 +507,13 @@ impl CosmicPasteService {
     ) -> zbus::fdo::Result<()> {
         let present = self.state.lock().await.applet_present;
         if !present {
-            return Err(zbus::fdo::Error::Failed(
-                "applet not in panel — add COSMIC Paste to the panel, or use `cosmic-paste history`"
-                    .into(),
-            ));
+            tracing::warn!(
+                "ShowHistory requested while applet_present is false; emitting signal anyway"
+            );
         }
         Self::emit_show_history(emitter).await?;
+        crate::show_history_trigger::signal();
+        super::applet_activation::activate_show_history().await;
         Ok(())
     }
 
@@ -534,12 +609,8 @@ impl CosmicPasteService {
     }
 
     async fn write_clipboard_text(&self, text: &str) -> zbus::fdo::Result<()> {
-        let tx = self.state.lock().await.clipboard_writer().map(Arc::clone);
-        let Some(tx) = tx else {
-            tracing::debug!("clipboard writer not configured; skipping write-back");
-            return Ok(());
-        };
-        write_clipboard(&tx, text).await
+        let guard = self.state.lock().await;
+        write_clipboard_for_paste(Some(&guard.self_copy_guard), text).await
     }
 
     async fn read_active_index(&self) -> zbus::fdo::Result<u32> {

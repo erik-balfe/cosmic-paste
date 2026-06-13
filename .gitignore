@@ -2,3 +2,8 @@
 **/*.rs.bk
 *.pdb
 .DS_Store
+
+# Local dev rules (not in VCS)
+AGENTS.md
+RULES.md
+.local/

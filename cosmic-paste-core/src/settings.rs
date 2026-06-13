@@ -33,14 +33,15 @@ pub struct ShortcutSettings {
 impl ShortcutSettings {
     pub fn default_bindings() -> Self {
         Self {
-            show_history: "<Ctrl><Alt>H".into(),
+            // Align with GNOME Clipboard Indicator defaults (Ctrl+F9 menu, F11/F12 cycle).
+            show_history: "<Ctrl>F9".into(),
+            select_previous: "<Ctrl>F11".into(),
+            select_next: "<Ctrl>F12".into(),
             launch_ui: "<Ctrl><Alt>G".into(),
             pop: "<Ctrl><Alt>V".into(),
             sync_clipboard_to_primary: "<Ctrl><Alt>O".into(),
             sync_primary_to_clipboard: "<Ctrl><Alt>P".into(),
             mark_password: "<Ctrl><Alt>S".into(),
-            select_previous: "<Ctrl><Alt>Up".into(),
-            select_next: "<Ctrl><Alt>Down".into(),
             ..Self::default()
         }
     }
@@ -82,7 +83,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            element_size: 60,
+            element_size: 72,
             growing_lines: false,
             history_name: "history".into(),
             images_support: false,
@@ -90,7 +91,7 @@ impl Default for Settings {
             images_preview_size: 50,
             close_on_select: true,
             open_centered: false,
-            max_displayed_history_size: 20,
+            max_displayed_history_size: 100,
             max_history_size: 100,
             max_memory_usage_mb: 30,
             max_text_item_size: 1_048_575,

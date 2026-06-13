@@ -5,6 +5,7 @@ use cosmic_config::CosmicConfigEntry;
 use tokio::sync::Mutex;
 
 use crate::dbus::clipboard::ClipboardWriteSender;
+use crate::dbus::guard::SharedSelfCopyGuard;
 use crate::dbus::lifecycle::LifecycleHandle;
 use crate::dbus::service::CosmicPasteService;
 use crate::persistence::{DataPaths, HistoryStore, LoadHistoryOutcome, SessionState};
@@ -20,6 +21,7 @@ pub struct DaemonState {
     pub applet_present: bool,
     pub portal_shortcuts_available: bool,
     clipboard_write: Option<ClipboardWriteSender>,
+    pub self_copy_guard: SharedSelfCopyGuard,
     store: HistoryStore,
 }
 
@@ -33,6 +35,7 @@ impl DaemonState {
             applet_present: false,
             portal_shortcuts_available: false,
             clipboard_write: None,
+            self_copy_guard: Arc::new(std::sync::Mutex::new(crate::dbus::SelfCopyGuard::new())),
             store: HistoryStore::new(DataPaths::new(
                 std::env::temp_dir().join(format!("cosmic-paste-test-{}", std::process::id())),
             )),
@@ -103,10 +106,15 @@ impl DaemonState {
             applet_present: false,
             portal_shortcuts_available: false,
             clipboard_write: None,
+            self_copy_guard: Arc::new(std::sync::Mutex::new(crate::dbus::SelfCopyGuard::new())),
             store,
         };
         state.apply_settings();
         Ok(state)
+    }
+
+    pub fn set_self_copy_guard(&mut self, guard: SharedSelfCopyGuard) {
+        self.self_copy_guard = guard;
     }
 
     pub fn on_applet_present_changed(&mut self, present: bool) {

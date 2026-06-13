@@ -105,6 +105,10 @@
       <arg type="i" name="offset" direction="in"/>
       <arg type="s" name="uuid" direction="out"/>
     </method>
+    <method name="SelectAtIndex">
+      <arg type="u" name="index" direction="in"/>
+      <arg type="s" name="uuid" direction="out"/>
+    </method>
     <method name="GetActiveIndex">
       <arg type="t" name="index" direction="out"/>
     </method>

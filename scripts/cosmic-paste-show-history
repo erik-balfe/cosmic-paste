@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+# Synchronous show-history for COSMIC custom shortcuts (no async CLI startup).
+set -eu
+
+RUNTIME="${XDG_RUNTIME_DIR:?}"
+BINDIR="$(cd "$(dirname "$0")" && pwd)"
+
+mkdir -p "${RUNTIME}/cosmic-paste"
+date +%s%3N > "${RUNTIME}/cosmic-paste/show-history"
+
+if command -v python3 >/dev/null 2>&1; then
+    python3 - "$RUNTIME/cosmic-paste/show-history.sock" <<'PY' 2>/dev/null || true
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+s.sendto(b"1", sys.argv[1])
+PY
+fi
+
+gdbus call --session -e \
+    -d org.system76.CosmicPaste \
+    -o /org/system76/CosmicPaste \
+    -m org.system76.CosmicPaste2.ShowHistory >/dev/null
+
+gdbus call --session -e \
+    -d com.system76.CosmicPaste.Applet \
+    -o /com/system76/CosmicPaste/Applet \
+    -m org.freedesktop.DbusActivation.ActivateAction \
+    show-history "[]" "{}" >/dev/null 2>&1 || true

@@ -54,6 +54,8 @@ pub async fn run_signal_emitter(
                 if let Err(err) = CosmicPasteService::emit_show_history(emitter).await {
                     tracing::warn!("failed to emit ShowHistory signal: {err}");
                 }
+                cosmic_paste_core::show_history_trigger::signal();
+                cosmic_paste_core::dbus::applet_activation::activate_show_history().await;
             }
         }
     }

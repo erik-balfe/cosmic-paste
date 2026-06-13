@@ -41,6 +41,20 @@ pub async fn run_ingest_loop(
             continue;
         }
 
+        if let Ok(mut copy_guard) = guard.self_copy_guard.lock() {
+            let fingerprint = cosmic_paste_core::item::text_checksum(text);
+            if copy_guard.should_suppress_ingest(fingerprint) {
+                tracing::debug!("ignoring clipboard event during pending navigation write");
+                copy_guard.clear_if_matched(fingerprint);
+                continue;
+            }
+        }
+
+        if guard.session.clipboard_echoes_active_item(text) {
+            tracing::debug!("ignoring clipboard echo of active history item");
+            continue;
+        }
+
         let outcome = guard.session_mut().ingest_text(text, None, unix_now());
         if matches!(outcome, IngestOutcome::RejectedTextSize) {
             tracing::debug!("clipboard text rejected by size policy");

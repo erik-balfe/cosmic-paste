@@ -1,7 +1,6 @@
 //! Clipboard monitor (ADR-001: wlr-data-control on dedicated thread → tokio mpsc).
 
 mod data_control;
-mod guard;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -9,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub use cosmic_paste_core::dbus::ClipboardWriteRequest;
-pub use guard::SelfCopyGuard;
+pub use cosmic_paste_core::dbus::SharedSelfCopyGuard;
 use tokio::sync::mpsc as async_mpsc;
 
 /// Which Wayland selection produced the payload.
@@ -45,14 +44,14 @@ impl Default for MonitorConfig {
 
 /// Handle to the background monitor thread.
 pub struct ClipboardMonitor {
-    guard: Arc<Mutex<SelfCopyGuard>>,
+    guard: SharedSelfCopyGuard,
     config: Arc<Mutex<MonitorConfig>>,
 }
 
 impl ClipboardMonitor {
-    pub fn new(config: MonitorConfig) -> Self {
+    pub fn new(config: MonitorConfig, guard: SharedSelfCopyGuard) -> Self {
         Self {
-            guard: Arc::new(Mutex::new(SelfCopyGuard::new())),
+            guard,
             config: Arc::new(Mutex::new(config)),
         }
     }

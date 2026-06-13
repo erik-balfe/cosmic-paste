@@ -10,15 +10,21 @@ pub mod error;
 pub mod history;
 pub mod item;
 pub mod persistence;
+pub mod selection_status;
 pub mod settings;
+pub mod show_history_trigger;
 
 pub use active_index::ActiveIndexState;
 pub use error::{Error, Result};
 pub use history::{History, HistoryPolicies, IngestOutcome};
-pub use item::{truncate_display, HistoryItem, ItemKind, RichPayload};
+pub use item::{
+    collapse_display_text, format_display_line, format_display_line_middle, truncate_display,
+    truncate_display_middle, HistoryItem, ItemKind, RichPayload,
+};
 pub use dbus::{
     client::CosmicPasteProxy, BUS_NAME, INTERFACE_NAME, OBJECT_PATH, VERSION as DAEMON_VERSION,
 };
+pub use selection_status::{format_selection_status, show_selection_toast};
 pub use settings::{Settings, ShortcutSettings, APP_ID as SETTINGS_APP_ID};
 pub use persistence::{
     checksum_hex, DataPaths, HistoryFile, HistoryStore, LoadHistoryOutcome, PersistenceError,
@@ -82,6 +88,14 @@ impl HistorySession {
         Ok((index, item))
     }
 
+    /// True when clipboard text is already the active history entry (navigation echo).
+    pub fn clipboard_echoes_active_item(&self, text: &str) -> bool {
+        self.history()
+            .get(self.active_index().active_index())
+            .and_then(|item| item.plain_text())
+            .is_some_and(|active| active == text)
+    }
+
     pub fn pop(&mut self) -> Option<HistoryItem> {
         let item = self.history.pop();
         if item.is_some() {
@@ -121,6 +135,16 @@ mod tests {
         session.active_index.set_active_index(2, 3).unwrap();
         session.ingest_text("fresh", None, 1);
         assert_eq!(session.active_index.active_index(), 0);
+    }
+
+    #[test]
+    fn clipboard_echoes_active_item_matches_plain_text() {
+        let mut session = HistorySession::with_defaults("history");
+        session.ingest_text("alpha", None, 1);
+        session.ingest_text("beta", None, 2);
+        session.active_index.set_active_index(0, 2).unwrap();
+        assert!(session.clipboard_echoes_active_item("beta"));
+        assert!(!session.clipboard_echoes_active_item("alpha"));
     }
 
     #[test]

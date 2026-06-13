@@ -28,9 +28,10 @@ async fn main() {
     let (clipboard_write_tx, clipboard_write_rx) =
         std::sync::mpsc::sync_channel(WRITE_QUEUE_DEPTH);
     daemon.set_clipboard_writer(clipboard_write_tx);
+    let self_copy_guard = daemon.self_copy_guard.clone();
 
     let watch_primary = daemon.settings.primary_to_history;
-    let show_history_accel = daemon.settings.shortcuts.show_history.clone();
+    let shortcuts = daemon.settings.shortcuts.clone();
 
     let (lifecycle, lifecycle_rx) = LifecycleHandle::pair();
     let service = daemon.service(lifecycle);
@@ -38,10 +39,13 @@ async fn main() {
 
     let (clipboard_tx, clipboard_rx) = mpsc::channel(64);
     let (signal_tx, signal_rx) = mpsc::channel(64);
-    let monitor = monitor::ClipboardMonitor::new(monitor::MonitorConfig {
-        watch_primary,
-        ..monitor::MonitorConfig::default()
-    });
+    let monitor = monitor::ClipboardMonitor::new(
+        monitor::MonitorConfig {
+            watch_primary,
+            ..monitor::MonitorConfig::default()
+        },
+        self_copy_guard,
+    );
     let monitor_config = monitor.shared_config();
     let _config_watcher = config::spawn_config_watcher(shared.clone(), monitor_config);
     let monitor_handle = monitor.spawn(clipboard_tx, clipboard_write_rx);
@@ -53,7 +57,9 @@ async fn main() {
     ));
     tokio::spawn(shortcuts::run_portal_spike(
         shared.clone(),
-        show_history_accel,
+        shortcuts.show_history,
+        shortcuts.select_previous,
+        shortcuts.select_next,
         portal_signal_tx,
     ));
 

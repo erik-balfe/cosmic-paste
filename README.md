@@ -1,28 +1,26 @@
 # cosmic-paste
 
-GPaste-inspired clipboard manager for the [COSMIC](https://github.com/pop-os/cosmic-epoch) desktop.
+Clipboard manager for [COSMIC](https://github.com/pop-os/cosmic-epoch).
 
-- **Design:** [`docs/DESIGN.md`](docs/DESIGN.md)
-- **Status:** [`docs/STATE.md`](docs/STATE.md)
+**Status:** [`docs/STATE.md`](docs/STATE.md)
 
-## Workspace
+## Install
 
-| Crate | Binary | Role |
-|-------|--------|------|
-| `cosmic-paste-core` | — | History, items, active-index state machine |
-| `cosmic-paste-daemon` | `cosmic-paste-daemon` | DBus server (clipboard monitor in PR 4) |
-| `cosmic-paste-applet` | `cosmic-paste-applet` | Panel indicator + popup (stub) |
-| `cosmic-paste-ui` | `cosmic-paste-ui` | Full history window (stub) |
-| `cosmic-paste-cli` | `cosmic-paste` | CLI client (stub) |
+```bash
+./scripts/install.sh
+```
+
+Then: Settings → Panel → Applets → COSMIC Paste.
 
 ## Build
 
 ```bash
-just          # release build
-just test     # unit tests
-just check    # clippy
+just test
+just check
 ```
 
-## Development
+## CLI
 
-PRs 1–3 are in tree: core types, persistence, and `CosmicPaste2` DBus skeleton. Next: ADR-001 clipboard monitor spike, then PR 4 text ingest.
+`cosmic-paste history | prev | next | show-history | add 'text' | version`
+
+BSD-2-Clause
