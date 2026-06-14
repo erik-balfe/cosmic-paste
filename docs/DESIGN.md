@@ -7,7 +7,7 @@
 | **Status** | Draft (rev 4 — user decisions applied) |
 | **Project** | `cosmic-paste` |
 | **App ID** | `com.system76.CosmicPaste` |
-| **Repository** | `github.com/erik-balfe/cosmic-paste` |
+| **Repository** | `https://github.com/erik-balfe/cosmic-paste` |
 
 ---
 
