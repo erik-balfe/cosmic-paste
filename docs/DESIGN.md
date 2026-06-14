@@ -7,7 +7,7 @@
 | **Status** | Draft (rev 4 — user decisions applied) |
 | **Project** | `cosmic-paste` |
 | **App ID** | `com.system76.CosmicPaste` |
-| **Repository** | `~/dev/projects/cosmic-paste` |
+| **Repository** | `github.com/erik-balfe/cosmic-paste` |
 
 ---
 
@@ -1354,8 +1354,8 @@ passwords = ["secret-service"]
 - [GPaste](https://github.com/Keruspe/GPaste) — primary feature reference
 - [GPaste DBus defines](https://github.com/Keruspe/GPaste/blob/master/src/libgpaste/gpaste/gpaste-gdbus-defines.h) — `org.gnome.GPaste2`
 - [cosmic-applet-template](https://github.com/pop-os/cosmic-applet-template) — applet/popup pattern
-- [cosmic-launcher](file:///home/erik/dev/projects/cosmic-launcher) — libcosmic, zbus, cosmic_config, logging (not daemon activation)
-- [cosmic-term](file:///home/erik/dev/projects/cosmic-term) — clipboard read/write, secret-service
+- [cosmic-launcher](https://github.com/pop-os/cosmic-launcher) — libcosmic, zbus, cosmic_config, logging (not daemon activation)
+- [cosmic-term](https://github.com/pop-os/cosmic-term) — clipboard read/write, secret-service
 - [cosmic-utils/clipboard-manager](https://github.com/pop-os/cosmic-utils/tree/master/clipboard-manager) — wlr-data-control prior art
 - [GPaste GlobalShortcutClient](https://github.com/Keruspe/GPaste) — `GPasteGtkGlobalShortcutClient` / portal pattern
 - [ashpd GlobalShortcuts](https://docs.rs/ashpd/latest/ashpd/desktop/global_shortcuts/index.html) — Rust portal client

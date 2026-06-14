@@ -2,12 +2,12 @@
 # COSMIC desktop + Wayland session required at runtime.
 class CosmicPaste < Formula
   desc "Clipboard manager for the COSMIC desktop"
-  homepage "https://github.com/erikbalfe/cosmic-paste"
+  homepage "https://github.com/erik-balfe/cosmic-paste"
   version "0.1.0"
   license "BSD-2-Clause"
 
   head do
-    url "https://github.com/erikbalfe/cosmic-paste.git", branch: "main"
+    url "https://github.com/erik-balfe/cosmic-paste.git", branch: "master"
   end
 
   depends_on "pkgconf" => :build

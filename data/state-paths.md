@@ -12,7 +12,7 @@ cosmic-paste/
 │   │   └── <checksum-hex>
 │   └── work.ron              # additional named histories
 ├── backups/
-│   └── history-2026-06-13.ron  # manual backups (PR 14a)
+│   └── history-2026-06-13.ron  # manual backups (planned)
 └── state.json                # session state: active_index, current_history
 ```
 
