@@ -4,9 +4,9 @@
 
 | Field | Value |
 |-------|-------|
-| **Author** | Erik Balfe (draft) |
+| **Author** | Erik Balfe |
 | **Date** | 2026-06-13 |
-| **Status** | Draft (rev 4 — user decisions applied) |
+| **Status** | Draft |
 | **Project** | `cosmic-paste` |
 | **App ID** | `com.system76.CosmicPaste` |
 | **Repository** | `https://github.com/erik-balfe/cosmic-paste` |
@@ -61,9 +61,9 @@ COSMIC ships no first-party clipboard manager. Users rely on:
 
 ### Goals
 
-1. **Feature parity with GPaste 50.x** for capture, history, passwords, images, multiple histories, CLI, persistence, and edge cases — **excluding upload/pastebin** (user decision rev 4).
+1. **Feature parity with GPaste 50.x** for capture, history, passwords, images, multiple histories, CLI, persistence, and edge cases — **excluding upload/pastebin**.
 2. **Native COSMIC UX**: panel applet with hover popup, libcosmic-themed full history window, cosmic_config settings.
-3. **Panel status via tooltip** showing truncated preview of active item, 1-based index, and total count (e.g. `3/47: git commit mes…`) — **tooltip only in v1** (user-confirmed).
+3. **Panel status via tooltip** showing truncated preview of active item, 1-based index, and total count (e.g. `3/47: git commit mes…`) — **tooltip only in v1**.
 4. **Global keyboard shortcuts** for GPaste defaults (**except upload**) plus **prev/next active item**; **optional** global quick-select 0–9 (**disabled by default**); in-popup Ctrl+index overlay (US-030) always available.
 5. **DBus-first API** (`org.system76.CosmicPaste`) mirroring GPaste's `org.gnome.GPaste2` for scripting compatibility mindset.
 6. **Wayland-only** clipboard monitoring (no X11 backend).
@@ -78,7 +78,7 @@ COSMIC ships no first-party clipboard manager. Users rely on:
 - Cloud sync of histories across machines
 - Windows/macOS ports
 - Tauri or Electron UI shell
-- **Pastebin / upload** (`Ctrl+Alt+U`, `Upload` DBus method, `cosmic-paste upload`) — **removed per user decision (rev 4)**; not deferred, out of scope for cosmic-paste
+- **Pastebin / upload** (`Ctrl+Alt+U`, `Upload` DBus method, `cosmic-paste upload`) — out of scope for cosmic-paste
 
 ---
 
@@ -378,7 +378,7 @@ COSMIC-paste introduces `active_index` for prev/next navigation. **GPaste has no
 | `EmptyHistory` | N/A (empty) | No | |
 | Growing-lines replace | **0** | No | Replaced entry stays at front |
 
-**`navigation_wrap` setting** (default `false`, **user-confirmed: clamp**): when false (default), `SelectAtOffset` no-ops at list boundary with optional brief notification; when true, wraps at ends. User decision rev 4: **clamp is the intended default behavior**.
+**`navigation_wrap` setting** (default `false`, clamp at ends): when false (default), `SelectAtOffset` no-ops at list boundary with optional brief notification; when true, wraps at ends.
 
 **`SetActiveIndex` vs prev/next:** Global prev/next shortcuts call `SelectAtOffset` (clipboard write). Popup keyboard ↑/↓ changes **UI focus** only until Enter (which calls `Select`). Panel tooltip can call `SetActiveIndex` on hover for live preview without polluting clipboard — optional v1.1 enhancement; v1 uses `GetActiveIndex` from daemon only.
 
@@ -476,7 +476,7 @@ fn subscription() -> Subscription<Message> {
 // Entry: cosmic::applet::run::<App>(())
 fn view(&self) -> Element<Message> {
     // v1 MVP: tooltip carries "3/47: preview" (US-021)
-    self.panel_icon_view() // icon_button; tooltip-only status (v1 MVP — user-confirmed)
+    self.panel_icon_view() // icon_button; tooltip-only status (v1 MVP)
         .on_press(Message::TogglePopup)
         .into()
 }
@@ -561,7 +561,7 @@ fn dbus_activation(&mut self, msg: cosmic::dbus_activation::Message) -> Task<Mes
 
 Preview truncation: `element_size` setting (default 60 chars), ellipsize end.
 
-**Panel badge — v1 MVP (user-confirmed: tooltip only):**
+**Panel badge — v1 MVP (tooltip only):**
 
 `cosmic-applet-template` has no badge API. **v1 ships tooltip-only** index/count in `status_tooltip()` (e.g. `3/47: git commit mes…`). No numeric overlay badge in v1. Overlay badge deferred to a future release if libcosmic gains applet badge support.
 
@@ -707,7 +707,7 @@ App ID: `com.system76.CosmicPaste`, versioned entries via `CosmicConfigEntry` de
 | `trim_items` | bool | false | `trim-items` |
 | `synchronize_clipboards` | bool | false | `synchronize-clipboards` |
 | `empty_history_confirmation` | bool | true | `empty-history-confirmation` |
-| `navigation_wrap` | bool | **false** (clamp) | **NEW** — user-confirmed default: clamp at ends; set true to wrap |
+| `navigation_wrap` | bool | **false** (clamp) | Clamp at ends by default; set true to wrap |
 | `track_applet_state` | bool | false | Replaces GPaste `track-extension-state` — pause daemon when applet disabled |
 | `screensaver_restore_clipboard` | bool | false | **v1.1 reserved** — restore clipboard after session unlock (US-140) |
 | `excluded_targets` | Vec\<String\> | `[]` | **v2 reserved** — Wayland app_id exclude list (US-148) |
@@ -775,7 +775,7 @@ GPaste compatibility note: Interface is `GPaste2` / we use `CosmicPaste2` to all
 | `SwitchHistory` | `name: s` | — | |
 | `Track` | `tracking_state: b` | — | |
 | `ShowHistory` | — | — | Runs fallback chain; also emitted as signal |
-| ~~`Upload`~~ | — | — | **Not implemented** — out of scope (user decision rev 4) |
+| ~~`Upload`~~ | — | — | **Not implemented** — out of scope |
 | `Reexecute` | — | — | Daemon restart after upgrade |
 | `About` | — | — | |
 | `OnAppletStateChanged` | `state: b` | — | Applet lifecycle; replaces GPaste `OnExtensionStateChanged` |
@@ -821,8 +821,8 @@ GPaste compatibility note: Interface is `GPaste2` / we use `CosmicPaste2` to all
 | Daemon activation | `Type=dbus` systemd | Same | Parity |
 | Global prev/next | None | `SelectAtOffset` shortcuts | COSMIC differentiator |
 | Global quick-select 0–9 | In-popup overlay only | **Disabled by default** globally | Avoid binding conflicts |
-| Upload / pastebin | `Ctrl+Alt+U`, `Upload` DBus, CLI `upload` | **Not planned** | User decision rev 4 — feature removed entirely |
-| Panel index badge | GNOME extension indicator | **Tooltip only (v1)** | User decision rev 4 — no overlay badge in v1 |
+| Upload / pastebin | `Ctrl+Alt+U`, `Upload` DBus, CLI `upload` | **Not planned** | Out of scope |
+| Panel index badge | GNOME extension indicator | **Tooltip only (v1)** | No overlay badge in v1 |
 | Clipboard monitor | GDK X11 backend | wlr-data-control (ADR-001) | Wayland-only COSMIC |
 | Screensaver restore | Core daemon feature | v1.1 | Defer; threat severity downgraded until then |
 | Import path | N/A | No auto-import from GPaste vault | Different bus name + secret-service vs GCR |
@@ -1084,7 +1084,7 @@ passwords = ["secret-service"]
 - Acceptance criteria: Tooltip updates on `Update` signal within 50ms; truncates per `element_size`.
 
 **US-022:** As a user, I want the panel icon to show active index at a glance, so that I know my position in history.
-- Acceptance criteria: **v1 (user-confirmed):** tooltip prefix `N/count: preview` shows 1-based index and total; no overlay badge in v1.
+- Acceptance criteria: **v1:** tooltip prefix `N/count: preview` shows 1-based index and total; no overlay badge in v1.
 
 **US-033:** As a user who has not added the panel applet, I want Ctrl+Alt+H and `cosmic-paste show-history` to still open history, so that shortcuts work without panel setup.
 - Acceptance criteria: (a) DBus `ActivateAction(show-history)` starts applet process; (b) if panel slot exists, popup within 500 ms; (c) if no panel slot or activation yields no popup, `cosmic-paste-ui --popup` fallback within 1 s; no silent failure.
@@ -1142,7 +1142,7 @@ passwords = ["secret-service"]
 **US-046:** As a user, I want Ctrl+Alt+S to mark the newest history item as password, so that I can protect recently copied secrets.
 - Acceptance criteria: **GPaste-compatible:** targets **`history[0]`**; prompts for password name; obfuscates in UI thereafter.
 
-**US-047:** ~~As a user, I want Ctrl+Alt+U to upload the newest history item to pastebin~~ — **CANCELLED (out of scope, user decision rev 4).** Upload/pastebin is not a cosmic-paste feature.
+**US-047:** ~~As a user, I want Ctrl+Alt+U to upload the newest history item to pastebin~~ — **Cancelled (out of scope).** Upload/pastebin is not a cosmic-paste feature.
 
 **US-048:** As a user, I want to disable any shortcut by clearing it in settings, so that I avoid conflicts.
 - Acceptance criteria: Empty string → portal unregisters binding.
@@ -1330,7 +1330,7 @@ passwords = ["secret-service"]
 **US-154:** As a user with portal permission denied, I want shortcuts registration to fail visibly, so that I can fix permissions.
 - Acceptance criteria: Daemon sets DBus property `PortalShortcutsAvailable=false`; preferences reads property via zbus on open; shows banner with portal permission guidance (US-141).
 
-**US-155:** ~~As a user enabling upload, I want the uploaded URL in history like GPaste~~ — **CANCELLED (out of scope, user decision rev 4).**
+**US-155:** ~~As a user enabling upload, I want the uploaded URL in history like GPaste~~ — **Cancelled (out of scope).**
 
 **US-156:** As a user navigating with prev/next at list boundary, I want clamp (or wrap) behavior per settings, so that navigation feels predictable.
 - Acceptance criteria: `navigation_wrap=false` → no-op at end with optional notification; `true` → wraps per state machine §1b.
@@ -1378,10 +1378,10 @@ passwords = ["secret-service"]
 | **Global shortcuts: `ashpd` + `org.freedesktop.portal.GlobalShortcuts`** | Same portal GPaste uses; **not** `xdg-desktop-portal-cosmic`-specific; **not** `cosmic-launcher` |
 | **ShowHistory three-step fallback** | Applet signal → DBus activate → `cosmic-paste-ui --popup`; fixes silent failure when applet absent |
 | **Active index for prev/next only** | `pop`/`mark-password` stay **GPaste index-0**; state machine §1b |
-| **`navigation_wrap` default false (clamp)** | User-confirmed rev 4; predictable navigation at list ends |
+| **`navigation_wrap` default false (clamp)** | Predictable navigation at list ends |
 | **Global quick-select default disabled** | Avoid `<Ctrl>0-9` conflicts; in-popup overlay (US-030) is default |
-| **Panel status v1: tooltip only** | User-confirmed rev 4; no overlay badge in v1 |
-| **Upload/pastebin removed** | User decision rev 4 — not deferred; `Ctrl+Alt+U`, DBus `Upload`, CLI `upload` excluded |
+| **Panel status v1: tooltip only** | No overlay badge in v1 |
+| **Upload/pastebin removed** | Out of scope; `Ctrl+Alt+U`, DBus `Upload`, CLI `upload` excluded |
 | **Password storage: secret-service (not GCR)** | `cosmic-term` pattern; documented deviation from GPaste |
 | **`OnAppletStateChanged` replaces `OnExtensionStateChanged`** | Panel applet optional; optional `track_applet_state` mirrors GPaste extension sync |
 | **Persistence: RON metadata + checksum blob files** | Single metadata format; no MessagePack ambiguity |
@@ -1625,7 +1625,7 @@ PR11+PR12+PR13 → PR14a → PR14b → PR14c → PR14d → PR15
 
 **Dependencies:** PR 14b, PR 12, PR 13
 
-**Description:** Clipboard write failure paths; concurrent add stress test; applet reconnect; navigation clamp tests. **No upload provider** (out of scope per user decision rev 4).
+**Description:** Clipboard write failure paths; concurrent add stress test; applet reconnect; navigation clamp tests. **No upload provider** (out of scope).
 
 ---
 
@@ -1660,4 +1660,4 @@ PR11+PR12+PR13 → PR14a → PR14b → PR14c → PR14d → PR15
 | 2026-06-13 | Initial draft |
 | 2026-06-13 | **Rev 2:** Addressed 20 review issues — ADR-001 clipboard spike, ashpd GlobalShortcuts, ShowHistory fallback, active index state machine, GPaste deviations table, expanded settings/user stories, fixed PR dependencies (18 PRs), panel badge MVP path, upload default off |
 | 2026-06-13 | **Rev 3:** Re-review fixes — ashpd 0.11 API sketch, PR 7b `--popup` ordering, Wayland monitor threading, applet DBusActivatable contract, `PortalShortcutsAvailable` DBus property, goals quick-select wording, `screensaver_restore_clipboard` setting (19 PRs) |
-| 2026-06-13 | **Rev 4:** User decisions — **upload/pastebin removed entirely** (Non-Goals; US-047/US-155 cancelled); **navigation_wrap clamp confirmed**; **panel badge tooltip-only for v1**; PR 14c stripped of upload; OQ-2/OQ-7 resolved |
+| 2026-06-13 | Upload/pastebin removed (Non-Goals; US-047/US-155 cancelled); navigation_wrap clamp default; panel badge tooltip-only for v1; OQ-2/OQ-7 resolved |

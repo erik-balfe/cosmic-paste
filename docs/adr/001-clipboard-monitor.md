@@ -1,7 +1,7 @@
 # ADR-001: Clipboard monitor backend
 
 **Status:** Accepted (spike complete — 2026-06-13)  
-**Context:** PR 4 gate per `docs/DESIGN.md` §daemon clipboard monitoring.
+**Context:** Daemon clipboard monitoring per `docs/DESIGN.md`.
 
 ## Decision
 
