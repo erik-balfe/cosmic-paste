@@ -32,7 +32,15 @@ Writes are atomic: `*.tmp.<pid>` in the same directory, `fsync`, then `rename(2)
 2. On failure, parse `*.ron.bak`
 3. If both fail, rename primary to `*.ron.corrupt` and start with an empty in-memory history
 
-## User install paths (`scripts/install.sh`)
+## Install methods
+
+| Method | Script |
+|--------|--------|
+| One-line (GitHub release) | `curl -fsSL …/install-remote.sh \| bash` |
+| Git checkout (build) | `./scripts/install.sh` |
+| Release tarball | `./scripts/install-release.sh` inside extracted bundle |
+
+## User install paths (`install.sh` / `install-remote.sh`)
 
 | Artifact | Path |
 |----------|------|

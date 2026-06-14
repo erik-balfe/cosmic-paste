@@ -33,7 +33,7 @@ cosmic-paste-ui/       stub (full history window — not shipped)
 | Linux, Wayland, COSMIC session | macOS, Windows, X11, GNOME/KDE generic |
 | `wlr-data-control` clipboard monitor | smithay-clipboard (not validated on COSMIC) |
 
-Install: `./scripts/install.sh` → `~/.local/bin`, user systemd unit, DBus activation file.
+Install: `install-remote.sh` (GitHub release bundle) or `./scripts/install.sh` (source) → `~/.local/bin`, user systemd unit, DBus activation file; daemon enabled automatically.
 
 ---
 

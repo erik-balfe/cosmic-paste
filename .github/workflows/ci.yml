@@ -60,18 +60,16 @@ jobs:
           toolchain: 1.93
       - uses: Swatinem/rust-cache@v2
 
-      - name: Build release binaries
+      - name: Build release bundle
         run: |
           cargo build --release -p cosmic-paste-daemon -p cosmic-paste-cli -p cosmic-paste-applet
-          mkdir -p dist
-          cp target/release/cosmic-paste-daemon dist/
-          cp target/release/cosmic-paste dist/
-          cp target/release/cosmic-paste-applet dist/
-          cp scripts/cosmic-paste-show-history dist/
-          chmod +x dist/*
-          tar czf cosmic-paste-linux-x86_64.tar.gz -C dist .
+          chmod +x scripts/build-release-bundle.sh
+          ./scripts/build-release-bundle.sh
+          ls -la target/*.tar.gz*
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: cosmic-paste-linux-x86_64.tar.gz
+          files: |
+            target/cosmic-paste-*-linux-x86_64.tar.gz
+            target/cosmic-paste-*-linux-x86_64.tar.gz.sha256

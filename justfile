@@ -5,9 +5,14 @@ export PKG_CONFIG_PATH := '/usr/lib64/pkgconfig:/usr/lib/pkgconfig:/usr/share/pk
 
 default: test
 
-# One-command user install (release build + systemd enable).
+# Install from git checkout (builds locally).
 install:
     "{{justfile_directory()}}/scripts/install.sh"
+
+# Build release tarball (after cargo build --release).
+release-bundle:
+    chmod +x "{{justfile_directory()}}/scripts/build-release-bundle.sh"
+    "{{justfile_directory()}}/scripts/build-release-bundle.sh"
 
 clean:
     cargo clean

@@ -36,11 +36,25 @@ Same key bindings either way. Custom shortcuts are the supported path when the p
 
 ## Install
 
+**Recommended (prebuilt release, one line):**
+
 ```bash
+curl -fsSL https://raw.githubusercontent.com/erik-balfe/cosmic-paste/master/scripts/install-remote.sh | bash
+```
+
+Installs runtime dependencies (`wl-clipboard`, etc.), downloads the latest GitHub release, enables the clipboard daemon, and prints the few GUI steps left (panel applet + shortcuts if needed).
+
+**From git (build locally):**
+
+```bash
+git clone https://github.com/erik-balfe/cosmic-paste.git
+cd cosmic-paste
 ./scripts/install.sh
 ```
 
-Then: **Settings → Desktop → Panel → Applets → End segment → COSMIC Paste** (if the icon is missing: `killall cosmic-panel`)
+**Requirements:** Linux x86_64, COSMIC on Wayland, `sudo` for package install if `wl-clipboard` is missing.
+
+**After install (GUI, once):** Settings → Desktop → Panel → Applets → End segment → **COSMIC Paste**
 
 ## Build
 
