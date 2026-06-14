@@ -1,5 +1,7 @@
 # cosmic-paste: Clipboard Manager for COSMIC Desktop
 
+> **Third-party software.** Not official COSMIC or System76 software. Targets the COSMIC desktop; uses `com.system76.*` app IDs following COSMIC conventions.
+
 | Field | Value |
 |-------|-------|
 | **Author** | Erik Balfe (draft) |
