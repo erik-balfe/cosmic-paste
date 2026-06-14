@@ -41,7 +41,7 @@ Portal and custom shortcuts use the **same default keys**. Many COSMIC sessions 
 - Guard timeout, show-history threads, subscription clone, `max_displayed_history_size`, `~/.local/bin` in units, toast on popup select
 - CI: Rust 1.93, clippy, tests (portal smoke skips when session unavailable)
 - Docs aligned with v0.1.0 behavior (`DESIGN.md` rewrite)
-- Popup matches panel applet chrome (`menu_button`, `[8, 0]` padding, 360px autosize)
+- Popup matches panel applet chrome (`get_popup` + `view_window`, `menu_button`, 360px autosize)
 
 ## Planned
 

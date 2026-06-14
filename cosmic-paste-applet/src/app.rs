@@ -7,7 +7,9 @@ use cosmic::iced::id::Id as WidgetId;
 use cosmic::iced::window::Id;
 use cosmic::iced::{Alignment, Length, Rectangle};
 use cosmic::applet::menu_button;
-use cosmic::surface::action::{app_popup, destroy_popup};
+use cosmic::iced::platform_specific::shell::wayland::commands::popup::{
+    destroy_popup, get_popup,
+};
 use cosmic::iced::widget::scrollable::{self, AbsoluteOffset};
 use cosmic::theme;
 use cosmic::widget::{column, row, scrollable as scrollable_widget, text};
@@ -222,48 +224,29 @@ impl App {
     }
 
     fn open_popup_task(&mut self, anchor: Option<PopupAnchor>) -> Task<Message> {
-        let scroll = self.scroll_popup_to_active_task();
-        if let Some(id) = self.popup.take() {
-            return Task::batch([
-                surface_task(destroy_popup(id)),
-                surface_task(self.open_popup_action(anchor)),
-                scroll,
-            ]);
+        if let Some(anchor) = anchor {
+            self.last_popup_anchor = Some(anchor);
         }
+        let new_id = Id::unique();
+        self.popup = Some(new_id);
+        let anchor = self.popup_anchor();
+        let mut popup_settings = self.core.applet.get_popup_settings(
+            self.core.main_window_id().unwrap(),
+            new_id,
+            None,
+            None,
+            None,
+        );
+        popup_settings.positioner.anchor_rect = Rectangle {
+            x: (anchor.bounds.x - anchor.offset_x) as i32,
+            y: (anchor.bounds.y - anchor.offset_y) as i32,
+            width: anchor.bounds.width as i32,
+            height: anchor.bounds.height as i32,
+        };
         Task::batch([
-            surface_task(self.open_popup_action(anchor)),
-            scroll,
+            get_popup(popup_settings),
+            self.scroll_popup_to_active_task(),
         ])
-    }
-
-    fn open_popup_action(&self, anchor: Option<PopupAnchor>) -> cosmic::surface::Action {
-        app_popup::<App>(
-            move |state: &mut App| {
-                let new_id = Id::unique();
-                state.popup = Some(new_id);
-                let mut popup_settings = state.core.applet.get_popup_settings(
-                    state.core.main_window_id().unwrap(),
-                    new_id,
-                    None,
-                    None,
-                    None,
-                );
-
-                if let Some(anchor) = anchor {
-                    popup_settings.positioner.anchor_rect = Rectangle {
-                        x: (anchor.bounds.x - anchor.offset_x) as i32,
-                        y: (anchor.bounds.y - anchor.offset_y) as i32,
-                        width: anchor.bounds.width as i32,
-                        height: anchor.bounds.height as i32,
-                    };
-                }
-
-                popup_settings
-            },
-            Some(Box::new(|state: &App| {
-                state.popup_content().map(cosmic::Action::App)
-            })),
-        )
     }
 }
 
@@ -322,9 +305,8 @@ impl cosmic::Application for App {
                 if let Some(anchor) = anchor {
                     self.last_popup_anchor = Some(anchor);
                 }
-                if self.popup.is_some() {
-                    let id = self.popup.take().expect("popup id");
-                    return surface_task(destroy_popup(id));
+                if let Some(id) = self.popup.take() {
+                    return destroy_popup(id);
                 }
                 return self.open_popup_task(Some(self.popup_anchor()));
             }
@@ -336,10 +318,7 @@ impl cosmic::Application for App {
                     cosmic::Action::App(Message::SelectDone(result))
                 });
                 if let Some(id) = popup_id {
-                    return Task::batch([
-                        surface_task(destroy_popup(id)),
-                        select,
-                    ]);
+                    return Task::batch([destroy_popup(id), select]);
                 }
                 return select;
             }
@@ -406,19 +385,12 @@ impl cosmic::Application for App {
     }
 
     fn view_window(&self, _id: Id) -> Element<'_, Message> {
-        // Popups use `view` + surface actions; this path is unused.
-        text("").into()
+        self.popup_content()
     }
 
     fn style(&self) -> Option<cosmic::iced::theme::Style> {
         Some(cosmic::applet::style())
     }
-}
-
-fn surface_task(action: cosmic::surface::Action) -> Task<Message> {
-    cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(
-        action,
-    )))
 }
 
 async fn select_entry_at_index(index: u32) -> Result<(), String> {
