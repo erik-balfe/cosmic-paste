@@ -1,7 +1,9 @@
 use zbus::interface;
 use zbus::object_server::SignalEmitter;
 
-use super::clipboard::{ack_clipboard_write_for_test, write_clipboard_for_paste};
+#[cfg(test)]
+use super::clipboard::ack_clipboard_write_for_test;
+use super::clipboard::write_clipboard_for_paste;
 use super::lifecycle::{LifecycleHandle, ShutdownReason};
 use super::state::SharedDaemonState;
 use super::{element_value, item_kind_name, parse_uuid, VERSION};
