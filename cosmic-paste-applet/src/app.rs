@@ -6,10 +6,11 @@ use cosmic::iced::core::window;
 use cosmic::iced::id::Id as WidgetId;
 use cosmic::iced::window::Id;
 use cosmic::iced::{Alignment, Length, Rectangle};
+use cosmic::applet::menu_button;
 use cosmic::surface::action::{app_popup, destroy_popup};
 use cosmic::iced::widget::scrollable::{self, AbsoluteOffset};
 use cosmic::theme;
-use cosmic::widget::{column, list_column, row, scrollable as scrollable_widget, text};
+use cosmic::widget::{column, row, scrollable as scrollable_widget, text};
 use cosmic::Element;
 use cosmic_paste_core::dbus::client::CosmicPasteProxy;
 use cosmic_paste_core::item::format_display_line_middle;
@@ -21,11 +22,11 @@ use crate::icons;
 
 pub const APP_ID: &str = "com.system76.CosmicPaste.Applet";
 
-/// Row height used by `list_column` (see libcosmic `list_column::into_element`).
+/// Applet menu row height (`menu_button` + body text); matches panel applets.
 const POPUP_ROW_HEIGHT: u32 = 32;
 const POPUP_SCROLL_THRESHOLD: usize = 10;
-/// ~10 visible rows; list capped by daemon `max_displayed_history_size`.
-const POPUP_SCROLL_VIEWPORT: f32 = 320.0;
+/// Scroll viewport when history exceeds threshold (bluetooth/network use 300).
+const POPUP_SCROLL_VIEWPORT: f32 = 300.0;
 /// Middle-truncated label width in the history popup (matches tooltip preview scale).
 const POPUP_LABEL_LEN: usize = 72;
 /// Stable id so scrollbar position survives popup content rebuilds (DBus refresh, hover).
@@ -145,65 +146,49 @@ impl App {
             .unwrap_or_else(|| self.default_popup_anchor())
     }
 
-    fn estimated_popup_size(&self) -> Option<(u32, u32)> {
-        let count = self.popup_item_count();
-        if count == 0 {
-            return None;
-        }
-        let height = if count > POPUP_SCROLL_THRESHOLD {
-            POPUP_SCROLL_VIEWPORT as u32 + 16
-        } else {
-            let rows = count as u32 * POPUP_ROW_HEIGHT;
-            let dividers = count.saturating_sub(1) as u32;
-            rows.saturating_add(dividers).saturating_add(16)
-        };
-        Some((360, height))
+    fn popup_shell<'a>(&self, body: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+        self.core
+            .applet
+            .popup_container(column![body.into()].padding([8, 0]).width(Length::Fill))
+            .into()
     }
 
     fn popup_content(&self) -> Element<'_, Message> {
         if self.daemon_unreachable {
-            return text("Clipboard daemon unreachable").into();
+            return self.popup_shell(text::body("Clipboard daemon unreachable"));
         }
         if self.popup_labels.is_empty() {
-            return text("No clipboard history yet").into();
+            return self.popup_shell(text::body("No clipboard history yet"));
         }
 
         let count = self.popup_labels.len();
-        let mut list = list_column::with_capacity(count);
+        let mut items = column::with_capacity(count);
         for (idx, label) in self.popup_labels.iter().enumerate() {
             let active = idx == self.active_index as usize;
-            let label_text = if active {
-                text::body(label).class(theme::Text::Accent)
-            } else {
-                text::body(label)
-            };
-            list = list.add(
-                list_column::button(
-                    row![label_text.width(Length::Fill)]
-                        .align_y(Alignment::Center)
-                        .width(Length::Fill),
-                )
-                .on_press(Message::SelectIndex(idx as u32))
-                .selected(active),
+            let mut item_row = row![text::body(label).width(Length::Fill)]
+                .align_y(Alignment::Center)
+                .spacing(8)
+                .width(Length::Fill);
+            if active {
+                item_row = item_row.push(text::caption("●").class(theme::Text::Accent));
+            }
+            items = items.push(
+                menu_button(item_row).on_press(Message::SelectIndex(idx as u32)),
             );
         }
 
-        let body = if count > POPUP_SCROLL_THRESHOLD {
+        let body: Element<'_, Message> = if count > POPUP_SCROLL_THRESHOLD {
             Element::from(
-                scrollable_widget(list)
+                scrollable_widget(items)
                     .id(POPUP_SCROLL_ID.clone())
                     .height(Length::Fixed(POPUP_SCROLL_VIEWPORT))
                     .width(Length::Fill),
             )
         } else {
-            Element::from(list)
+            items.into()
         };
 
-        Element::from(
-            self.core
-                .applet
-                .popup_container(column![body].padding([8, 12]).width(Length::Fill)),
-        )
+        self.popup_shell(body)
     }
 
     fn show_history_task(&mut self) -> Task<Message> {
@@ -252,7 +237,6 @@ impl App {
     }
 
     fn open_popup_action(&self, anchor: Option<PopupAnchor>) -> cosmic::surface::Action {
-        let popup_size = self.estimated_popup_size();
         app_popup::<App>(
             move |state: &mut App| {
                 let new_id = Id::unique();
@@ -260,7 +244,7 @@ impl App {
                 let mut popup_settings = state.core.applet.get_popup_settings(
                     state.core.main_window_id().unwrap(),
                     new_id,
-                    popup_size,
+                    None,
                     None,
                     None,
                 );
