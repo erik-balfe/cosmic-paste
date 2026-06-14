@@ -27,7 +27,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.90
+          toolchain: 1.93
           components: clippy
 
       - uses: Swatinem/rust-cache@v2
@@ -55,7 +55,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.90
+          toolchain: 1.93
       - uses: Swatinem/rust-cache@v2
 
       - name: Build release binaries

@@ -14,7 +14,7 @@ v0.1.0 — clipboard manager for COSMIC (libcosmic, daemon, wlr-data-control).
 
 - SelfCopyGuard through clipboard write (5250 ms)
 - Popup scroll id stable; skip label rebuild when history unchanged
-- Review fixes: guard timeout, single show-history threads, subscription clone, `max_displayed_history_size`, `~/.local/bin` in units, toast on popup select, CI rust 1.90
+- Review fixes: guard timeout, single show-history threads, subscription clone, `max_displayed_history_size`, `~/.local/bin` in units, toast on popup select
 
 ## Planned
 
