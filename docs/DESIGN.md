@@ -997,7 +997,7 @@ N/A for desktop app; user-visible **inline banner** in applet popup / full UI (l
 
 - Daemon + text history + applet popup + `show-history` shortcut
 - cosmic_config basic settings
-- Install via `just install` to `~/dev/projects/cosmic-paste`
+- Install via `./scripts/install.sh` or `just install-user`
 
 ### Phase 2: GPaste Parity
 
@@ -1419,7 +1419,7 @@ PR11+PR12+PR13 → PR14a → PR14b → PR14c → PR14d → PR15
 
 **Dependencies:** None
 
-**Description:** Create multi-crate workspace at `~/dev/projects/cosmic-paste`. Define `HistoryItem`, `ItemKind`, in-memory `History` with dedup, size limits, **`ActiveIndexState` stub**, and unit tests for state machine §1b transitions. No I/O yet.
+**Description:** Create multi-crate workspace. Define `HistoryItem`, `ItemKind`, in-memory `History` with dedup, size limits, **`ActiveIndexState` stub**, and unit tests for state machine §1b transitions. No I/O yet.
 
 ---
 

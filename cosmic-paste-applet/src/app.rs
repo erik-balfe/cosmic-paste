@@ -393,7 +393,8 @@ impl cosmic::Application for App {
     }
 
     fn view_window(&self, _id: Id) -> Element<'_, Message> {
-        "oops".into()
+        // Popups use `view` + surface actions; this path is unused.
+        text("").into()
     }
 
     fn style(&self) -> Option<cosmic::iced::theme::Style> {
