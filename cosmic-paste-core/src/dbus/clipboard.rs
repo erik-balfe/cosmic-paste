@@ -81,6 +81,21 @@ fn arm_self_copy_guard(guard: Option<&SharedSelfCopyGuard>, text: &str) {
     }
 }
 
+/// Test harness: arm guard without touching the system clipboard.
+#[cfg(test)]
+pub async fn ack_clipboard_write_for_test(
+    guard: Option<&SharedSelfCopyGuard>,
+    text: &str,
+) -> zbus::fdo::Result<()> {
+    if text.is_empty() {
+        return Err(zbus::fdo::Error::Failed(
+            "selected history item has no pasteable text".into(),
+        ));
+    }
+    arm_self_copy_guard(guard, text);
+    Ok(())
+}
+
 /// Fast paste path: arm the self-copy guard, then write via wl-copy only.
 ///
 /// A background data-control write used to race wl-copy and could replace the

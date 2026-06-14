@@ -69,8 +69,9 @@ mod tests {
     static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     async fn spawn_test_service() -> (zbus::Connection, zbus::Connection, String) {
-        let service =
-            DaemonState::new_in_memory().service(crate::dbus::lifecycle::LifecycleHandle::detached());
+        let mut daemon = DaemonState::new_in_memory();
+        daemon.ack_clipboard_writes = true;
+        let service = daemon.service(crate::dbus::lifecycle::LifecycleHandle::detached());
         let bus_name = format!(
             "{BUS_NAME}.test{}.case{}",
             std::process::id(),

@@ -23,7 +23,8 @@ jobs:
           sudo apt-get install -y \
             libxkbcommon-dev \
             pkg-config \
-            libwayland-dev
+            libwayland-dev \
+            wl-clipboard
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -51,7 +52,8 @@ jobs:
           sudo apt-get install -y \
             libxkbcommon-dev \
             pkg-config \
-            libwayland-dev
+            libwayland-dev \
+            wl-clipboard
 
       - uses: dtolnay/rust-toolchain@master
         with:

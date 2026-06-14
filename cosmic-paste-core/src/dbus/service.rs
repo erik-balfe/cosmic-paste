@@ -1,7 +1,7 @@
 use zbus::interface;
 use zbus::object_server::SignalEmitter;
 
-use super::clipboard::write_clipboard_for_paste;
+use super::clipboard::{ack_clipboard_write_for_test, write_clipboard_for_paste};
 use super::lifecycle::{LifecycleHandle, ShutdownReason};
 use super::state::SharedDaemonState;
 use super::{element_value, item_kind_name, parse_uuid, VERSION};
@@ -610,6 +610,10 @@ impl CosmicPasteService {
 
     async fn write_clipboard_text(&self, text: &str) -> zbus::fdo::Result<()> {
         let guard = self.state.lock().await;
+        #[cfg(test)]
+        if guard.ack_clipboard_writes {
+            return ack_clipboard_write_for_test(Some(&guard.self_copy_guard), text).await;
+        }
         write_clipboard_for_paste(Some(&guard.self_copy_guard), text).await
     }
 

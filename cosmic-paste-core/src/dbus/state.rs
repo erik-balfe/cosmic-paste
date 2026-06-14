@@ -22,6 +22,9 @@ pub struct DaemonState {
     pub portal_shortcuts_available: bool,
     clipboard_write: Option<ClipboardWriteSender>,
     pub self_copy_guard: SharedSelfCopyGuard,
+    /// Test harness: skip wl-copy, acknowledge writes in-process.
+    #[cfg(test)]
+    pub ack_clipboard_writes: bool,
     store: HistoryStore,
 }
 
@@ -36,6 +39,8 @@ impl DaemonState {
             portal_shortcuts_available: false,
             clipboard_write: None,
             self_copy_guard: Arc::new(std::sync::Mutex::new(crate::dbus::SelfCopyGuard::new())),
+            #[cfg(test)]
+            ack_clipboard_writes: false,
             store: HistoryStore::new(DataPaths::new(
                 std::env::temp_dir().join(format!("cosmic-paste-test-{}", std::process::id())),
             )),
@@ -107,6 +112,8 @@ impl DaemonState {
             portal_shortcuts_available: false,
             clipboard_write: None,
             self_copy_guard: Arc::new(std::sync::Mutex::new(crate::dbus::SelfCopyGuard::new())),
+            #[cfg(test)]
+            ack_clipboard_writes: false,
             store,
         };
         state.apply_settings();
