@@ -28,7 +28,7 @@ async fn portal_shortcut_bind_smoke() {
         "show-history",
         "cosmic-paste PR7a bind smoke test",
     )
-    .preferred_trigger(Some("<Ctrl><Alt>H"));
+    .preferred_trigger(Some("<Ctrl>F11"));
 
     let Ok(bind_req) = proxy.bind_shortcuts(&session, &[shortcut], None).await else {
         eprintln!("skip: BindShortcuts request failed");
@@ -49,7 +49,7 @@ async fn portal_shortcut_bind_smoke() {
 }
 
 #[tokio::test]
-#[ignore = "manual on COSMIC: run with `just test-portal` and press Ctrl+Alt+H"]
+#[ignore = "manual on COSMIC: run with `just test-portal` and press Ctrl+F11"]
 async fn portal_shortcut_fire() {
     if !portal_reachable().await {
         eprintln!("skip: portal not reachable");
@@ -58,8 +58,8 @@ async fn portal_shortcut_fire() {
 
     let proxy = GlobalShortcuts::new().await.expect("portal");
     let session = proxy.create_session().await.expect("session");
-    let shortcut = NewShortcut::new("show-history", "Press Ctrl+Alt+H now")
-        .preferred_trigger(Some("<Ctrl><Alt>H"));
+    let shortcut = NewShortcut::new("show-history", "Press Ctrl+F11 now")
+        .preferred_trigger(Some("<Ctrl>F11"));
     let bind_req = proxy
         .bind_shortcuts(&session, &[shortcut], None)
         .await
@@ -69,7 +69,7 @@ async fn portal_shortcut_fire() {
         .expect("approve shortcut permission if prompted");
 
     let mut activated = proxy.receive_activated().await.expect("Activated stream");
-    eprintln!("Waiting up to 30s for Ctrl+Alt+H (show-history)...");
+    eprintln!("Waiting up to 30s for Ctrl+F11 (show-history)...");
 
     let fired = tokio::time::timeout(Duration::from_secs(30), async {
         while let Some(activation) = activated.next().await {

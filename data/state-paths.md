@@ -8,11 +8,11 @@ cosmic-paste/
 │   ├── history.ron           # metadata + item records (RON body after binary header)
 │   ├── history.ron.bak       # previous revision before last atomic save
 │   ├── history.ron.corrupt   # renamed primary after unrecoverable parse failure
-│   ├── history.blobs/        # image/binary payloads keyed by SHA-256 hex
+│   ├── history.blobs/        # image/binary payloads keyed by SHA-256 hex (future)
 │   │   └── <checksum-hex>
-│   └── work.ron              # additional named histories
+│   └── work.ron              # additional named histories (future)
 ├── backups/
-│   └── history-2026-06-13.ron  # manual backups (planned)
+│   └── history-YYYY-MM-DD.ron  # manual backups (planned)
 └── state.json                # session state: active_index, current_history
 ```
 
@@ -32,12 +32,14 @@ Writes are atomic: `*.tmp.<pid>` in the same directory, `fsync`, then `rename(2)
 2. On failure, parse `*.ron.bak`
 3. If both fail, rename primary to `*.ron.corrupt` and start with an empty in-memory history
 
-## Packaged / user install paths
+## User install paths (`scripts/install.sh`)
 
-| Artifact | System path | User dev install (`just install-user`) |
-|----------|-------------|----------------------------------------|
-| systemd unit | `/usr/lib/systemd/user/com.system76.CosmicPaste.service` | `~/.config/systemd/user/com.system76.CosmicPaste.service` |
-| D-Bus activation | `/usr/share/dbus-1/services/com.system76.CosmicPaste.service` | `~/.local/share/dbus-1/services/com.system76.CosmicPaste.service` |
-| daemon binary | `/usr/bin/cosmic-paste-daemon` | `target/debug/cosmic-paste-daemon` (substituted at install) |
+| Artifact | Path |
+|----------|------|
+| Binaries | `~/.local/bin/` (`cosmic-paste-daemon`, `cosmic-paste`, `cosmic-paste-applet`, `cosmic-paste-show-history`) |
+| systemd unit | `~/.config/systemd/user/com.system76.CosmicPaste.service` |
+| D-Bus activation | `~/.local/share/dbus-1/services/org.system76.CosmicPaste.service` |
+| Applet desktop | `~/.local/share/applications/com.system76.CosmicPaste.Applet.desktop` |
+| Applet icon | `~/.local/share/icons/hicolor/scalable/apps/com.system76.CosmicPaste.Applet-symbolic.svg` |
 
-DBus activation uses `Type=dbus` — systemd starts the daemon when the bus name is first requested.
+DBus bus name: `org.system76.CosmicPaste`. Activation uses `Type=dbus` — systemd starts the daemon when the name is first requested.

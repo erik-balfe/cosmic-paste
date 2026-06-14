@@ -21,7 +21,7 @@ build-release:
 test:
     cargo test --workspace
 
-# Manual COSMIC session check: binds show-history then waits for Ctrl+Alt+H.
+# Manual COSMIC session check: binds show-history then waits for Ctrl+F11.
 test-portal:
     cargo test -p cosmic-paste-daemon --test portal_shortcut_fire portal_shortcut_fire -- --ignored --nocapture
 

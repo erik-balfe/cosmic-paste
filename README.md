@@ -1,12 +1,14 @@
 # cosmic-paste
 
-Clipboard manager for the [COSMIC](https://github.com/pop-os/cosmic-epoch) desktop.
+Clipboard manager for the [COSMIC](https://github.com/pop-os/cosmic-epoch) desktop on **Linux (Wayland)**.
 
-**Not official.** This is independent, third-party software. It is **not** made, endorsed, or maintained by System76 or the COSMIC project. The name refers to the desktop it targets — I use COSMIC daily and built this to work well with it.
+**Not official.** Independent third-party software — not made, endorsed, or maintained by System76 or the COSMIC project.
 
-**Status:** [`docs/STATE.md`](docs/STATE.md)
+**Status:** [`docs/STATE.md`](docs/STATE.md) · **Architecture:** [`docs/DESIGN.md`](docs/DESIGN.md)
 
-Default shortcuts (daemon portal, when available):
+## Keyboard shortcuts
+
+Default bindings:
 
 | Key | Action |
 |-----|--------|
@@ -14,7 +16,23 @@ Default shortcuts (daemon portal, when available):
 | Ctrl+F10 | Back — older clipboard item |
 | Ctrl+F11 | Open history popup |
 
-On many COSMIC builds the portal is unavailable — merge [`data/examples/cosmic-custom-shortcuts.ron`](data/examples/cosmic-custom-shortcuts.ron) into COSMIC Settings → Keyboard → Custom shortcuts (same bindings; use `cosmic-paste-show-history` for F11).
+### Portal vs custom shortcuts
+
+The daemon can register these keys via the **XDG GlobalShortcuts portal** (freedesktop DBus API). When that works, shortcuts need no COSMIC Settings entries. Check:
+
+```bash
+busctl --user get-property org.system76.CosmicPaste /org/system76/CosmicPaste \
+  org.system76.CosmicPaste2 PortalShortcutsAvailable
+```
+
+`true` = portal handles Ctrl+F9/F10/F11. **`false` is common on COSMIC** — use custom shortcuts instead:
+
+1. Open **Settings → Keyboard → Custom shortcuts**
+2. Merge [`data/examples/cosmic-custom-shortcuts.ron`](data/examples/cosmic-custom-shortcuts.ron) into `~/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom`
+3. Replace `@bindir@` with your binary path (e.g. `~/.local/bin`)
+4. Restart is not required for custom shortcuts; restart the daemon only if you changed cosmic_config `shortcuts` for portal mode
+
+Same key bindings either way. Custom shortcuts are the supported path when the portal is absent.
 
 ## Install
 
@@ -22,7 +40,7 @@ On many COSMIC builds the portal is unavailable — merge [`data/examples/cosmic
 ./scripts/install.sh
 ```
 
-Then: Settings → Panel → Applets → COSMIC Paste.
+Then: **Settings → Desktop → Panel → Applets → End segment → COSMIC Paste** (if the icon is missing: `killall cosmic-panel`)
 
 ## Build
 
@@ -34,5 +52,7 @@ just check
 ## CLI
 
 `cosmic-paste history | prev | next | show-history | add 'text' | version`
+
+- `prev` = newer (index toward 0), `next` = older — see [`docs/DESIGN.md`](docs/DESIGN.md)
 
 BSD-2-Clause

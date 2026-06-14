@@ -22,7 +22,7 @@ pub const APP_ID: &str = "com.system76.CosmicPaste.Applet";
 /// Row height used by `list_column` (see libcosmic `list_column::into_element`).
 const POPUP_ROW_HEIGHT: u32 = 32;
 const POPUP_SCROLL_THRESHOLD: usize = 10;
-/// ~10 visible rows; full history (up to `max_history_size`) scrolls inside.
+/// ~10 visible rows; list capped by daemon `max_displayed_history_size`.
 const POPUP_SCROLL_VIEWPORT: f32 = 320.0;
 /// Middle-truncated label width in the history popup (matches tooltip preview scale).
 const POPUP_LABEL_LEN: usize = 72;

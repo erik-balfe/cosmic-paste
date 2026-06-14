@@ -8,6 +8,10 @@ use crate::HistoryPolicies;
 pub const APP_ID: &str = "com.system76.CosmicPaste";
 
 /// Global shortcut accelerators (empty string disables a binding).
+///
+/// v0.1.0 portal wiring: only `show_history`, `select_previous`, `select_next`.
+/// `select_previous` → newer (offset −1); `select_next` → older (offset +1).
+/// GPaste-style IDs — not English “back/forward in time”.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ShortcutSettings {
     pub show_history: String,
@@ -16,7 +20,9 @@ pub struct ShortcutSettings {
     pub sync_clipboard_to_primary: String,
     pub sync_primary_to_clipboard: String,
     pub mark_password: String,
+    /// Bound to portal `select-previous` → `SelectAtOffset(-1)` (newer).
     pub select_previous: String,
+    /// Bound to portal `select-next` → `SelectAtOffset(+1)` (older).
     pub select_next: String,
     pub quick_select_0: String,
     pub quick_select_1: String,

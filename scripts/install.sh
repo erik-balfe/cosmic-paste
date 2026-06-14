@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-command user install for cosmic-paste.
 # Builds release binaries, installs to ~/.local/bin, enables the user daemon.
-# Panel applet: add once via Settings → Panel → Applets → COSMIC Paste.
+# Panel applet: add once via Settings → Desktop → Panel → Applets → COSMIC Paste.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -76,8 +76,9 @@ echo "One manual step — add the panel applet:"
 echo "  Settings → Desktop → Panel → Applets → End segment → COSMIC Paste"
 echo "  If the icon does not appear: killall cosmic-panel"
 echo ""
-echo "Default shortcuts: Ctrl+F9 newer, Ctrl+F10 older, Ctrl+F11 popup (GlobalShortcuts portal)."
-echo "If portal shortcuts do not work on your COSMIC build, add custom Spawn shortcuts:"
+echo "Default shortcuts: Ctrl+F9 newer, Ctrl+F10 older, Ctrl+F11 popup."
+echo "Check portal: busctl --user get-property org.system76.CosmicPaste /org/system76/CosmicPaste org.system76.CosmicPaste2 PortalShortcutsAvailable"
+echo "If false (common on COSMIC), add custom Spawn shortcuts:"
 echo "  ${ROOT}/data/examples/cosmic-custom-shortcuts.ron"
 echo "  Merge into ~/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom"
 echo ""

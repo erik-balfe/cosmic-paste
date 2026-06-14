@@ -1,6 +1,6 @@
 [Unit]
 Description=COSMIC Paste clipboard daemon
-Documentation=https://github.com/pop-os/cosmic-epoch
+Documentation=https://github.com/erik-balfe/cosmic-paste
 After=graphical-session.target
 
 [Service]
