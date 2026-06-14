@@ -6,7 +6,15 @@ Clipboard manager for the [COSMIC](https://github.com/pop-os/cosmic-epoch) deskt
 
 **Status:** [`docs/STATE.md`](docs/STATE.md)
 
-Keyboard shortcuts (Ctrl+F9/F11/F12) use the XDG GlobalShortcuts portal. On some COSMIC builds the portal is unavailable — merge [`data/examples/cosmic-custom-shortcuts.ron`](data/examples/cosmic-custom-shortcuts.ron) into COSMIC Settings → Keyboard → Custom shortcuts instead.
+Default shortcuts (daemon portal, when available):
+
+| Key | Action |
+|-----|--------|
+| Ctrl+F9 | Forward — newer clipboard item |
+| Ctrl+F10 | Back — older clipboard item |
+| Ctrl+F11 | Open history popup |
+
+On many COSMIC builds the portal is unavailable — merge [`data/examples/cosmic-custom-shortcuts.ron`](data/examples/cosmic-custom-shortcuts.ron) into COSMIC Settings → Keyboard → Custom shortcuts (same bindings; use `cosmic-paste-show-history` for F11).
 
 ## Install
 

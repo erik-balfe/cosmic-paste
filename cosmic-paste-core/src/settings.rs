@@ -33,10 +33,10 @@ pub struct ShortcutSettings {
 impl ShortcutSettings {
     pub fn default_bindings() -> Self {
         Self {
-            // Align with GNOME Clipboard Indicator defaults (Ctrl+F9 menu, F11/F12 cycle).
-            show_history: "<Ctrl>F9".into(),
-            select_previous: "<Ctrl>F11".into(),
-            select_next: "<Ctrl>F12".into(),
+            // Ctrl+F9/F10 cycle newer/older; Ctrl+F11 opens history popup.
+            show_history: "<Ctrl>F11".into(),
+            select_previous: "<Ctrl>F9".into(),
+            select_next: "<Ctrl>F10".into(),
             launch_ui: "<Ctrl><Alt>G".into(),
             pop: "<Ctrl><Alt>V".into(),
             sync_clipboard_to_primary: "<Ctrl><Alt>O".into(),

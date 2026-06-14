@@ -146,7 +146,7 @@ reset-applet-in-settings:
     echo "Reopen Settings → Panel → Applets → Add applet → COSMIC Paste (end segment only)."
     echo "Then: killall cosmic-panel"
 
-# Print RON snippets for Settings → Keyboard → Custom shortcuts (Ctrl+F9–F12 example).
+# Print RON snippets for Settings → Keyboard → Custom shortcuts (Ctrl+F9–F11).
 show-cosmic-shortcuts:
     @cat "{{justfile_directory()}}/data/examples/cosmic-custom-shortcuts.ron"
     @echo ""

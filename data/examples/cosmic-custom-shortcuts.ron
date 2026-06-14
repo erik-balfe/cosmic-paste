@@ -4,23 +4,21 @@
 // Merge into:
 //   ~/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom
 //
-// GNOME Clipboard Indicator defaults: Ctrl+F9 toggle menu, Ctrl+F11 prev, Ctrl+F12 next.
-// cosmic-paste maps the same chords when the portal is unavailable.
-//
-// Prefer the show-history helper (sync gdbus + unix socket) over plain CLI for F9/F11 menu.
+// Index 0 = newest. Ctrl+F9 = forward (newer), Ctrl+F10 = back (older), Ctrl+F11 = popup.
+// Use cosmic-paste-show-history for F11 (sync gdbus + unix socket; faster than CLI).
 
 (
     modifiers: [Ctrl],
     key: "F9",
-    description: Some("cosmic-paste: open history popup"),
-): Spawn("@bindir@/cosmic-paste-show-history"),
-(
-    modifiers: [Ctrl],
-    key: "F11",
-    description: Some("cosmic-paste: newer item"),
+    description: Some("cosmic-paste: forward (newer)"),
 ): Spawn("@bindir@/cosmic-paste prev"),
 (
     modifiers: [Ctrl],
-    key: "F12",
-    description: Some("cosmic-paste: older item"),
+    key: "F10",
+    description: Some("cosmic-paste: back (older)"),
 ): Spawn("@bindir@/cosmic-paste next"),
+(
+    modifiers: [Ctrl],
+    key: "F11",
+    description: Some("cosmic-paste: history popup"),
+): Spawn("@bindir@/cosmic-paste-show-history"),

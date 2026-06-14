@@ -20,7 +20,7 @@ Build a stable, maintainable clipboard manager that follows COSMIC APIs, design 
 ## Now (v0.1.0)
 
 - Text history, persistence, panel applet, scrollable popup (100 items)
-- Shortcuts: Ctrl+F9 menu, Ctrl+F11 prev, Ctrl+F12 next (portal; see limitations)
+- Shortcuts: Ctrl+F9 newer, Ctrl+F10 older, Ctrl+F11 popup (portal; see limitations)
 - Navigation toasts: fixed 2 lines, 80-char middle-truncated preview
 - Show-history: file + unix socket + DBus + DbusActivation (`cosmic-paste-show-history`)
 - Install: `./scripts/install.sh`; add panel applet once in Settings

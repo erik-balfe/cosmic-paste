@@ -35,9 +35,9 @@ enum Commands {
         #[arg(value_enum)]
         mode: TrackMode,
     },
-    /// Select the previous (older) history item.
+    /// Select a newer history item (toward index 0).
     Prev,
-    /// Select the next (newer) history item.
+    /// Select an older history item (away from index 0).
     Next,
     /// Open the panel history popup (requires applet in panel).
     ShowHistory,

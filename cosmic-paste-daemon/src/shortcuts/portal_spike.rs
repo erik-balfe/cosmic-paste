@@ -42,12 +42,12 @@ fn collect_bindings(
         },
         Binding {
             id: SELECT_PREVIOUS_ID,
-            description: "Select newer clipboard item",
+            description: "Forward to newer clipboard item (Ctrl+F9)",
             accel: select_previous.to_owned(),
         },
         Binding {
             id: SELECT_NEXT_ID,
-            description: "Select older clipboard item",
+            description: "Back to older clipboard item (Ctrl+F10)",
             accel: select_next.to_owned(),
         },
     ]
