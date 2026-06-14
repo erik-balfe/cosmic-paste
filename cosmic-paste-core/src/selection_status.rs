@@ -73,15 +73,24 @@ fn toast_worker(rx: mpsc::Receiver<ToastCommand>) {
     }
 }
 
-fn toast_sender() -> &'static mpsc::Sender<ToastCommand> {
-    TOAST_TX.get_or_init(|| {
-        let (tx, rx) = mpsc::channel();
-        thread::Builder::new()
-            .name("cosmic-paste-toast".into())
-            .spawn(move || toast_worker(rx))
-            .ok();
-        tx
-    })
+fn ensure_toast_sender() -> Option<&'static mpsc::Sender<ToastCommand>> {
+    if let Some(tx) = TOAST_TX.get() {
+        return Some(tx);
+    }
+    let (tx, rx) = mpsc::channel();
+    match thread::Builder::new()
+        .name("cosmic-paste-toast".into())
+        .spawn(move || toast_worker(rx))
+    {
+        Ok(_) => {
+            let _ = TOAST_TX.set(tx);
+            TOAST_TX.get()
+        }
+        Err(err) => {
+            tracing::error!("failed to spawn toast worker: {err}");
+            None
+        }
+    }
 }
 
 fn pad_display_line(line: &str, width: usize, pad: char) -> String {
@@ -200,8 +209,13 @@ fn parse_notify_reply(stdout: &[u8]) -> Option<u32> {
 
 /// Brief COSMIC/desktop notification after keyboard history navigation.
 pub fn show_selection_toast(active_index: u32, count: u32, preview: &str) {
+    let Some(tx) = ensure_toast_sender() else {
+        return;
+    };
     let (summary, body) = format_selection_toast_parts(active_index, count, preview);
-    let _ = toast_sender().send(ToastCommand::Show { summary, body });
+    if let Err(err) = tx.send(ToastCommand::Show { summary, body }) {
+        tracing::warn!("failed to queue selection toast: {err}");
+    }
 }
 
 #[cfg(test)]

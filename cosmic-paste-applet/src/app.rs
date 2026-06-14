@@ -7,6 +7,8 @@ use cosmic::iced::id::Id as WidgetId;
 use cosmic::iced::window::Id;
 use cosmic::iced::{Alignment, Length, Rectangle};
 use cosmic::surface::action::{app_popup, destroy_popup};
+use cosmic::iced::widget::scrollable::{self, AbsoluteOffset};
+use cosmic::theme;
 use cosmic::widget::{column, list_column, row, scrollable as scrollable_widget, text};
 use cosmic::Element;
 use cosmic_paste_core::dbus::client::CosmicPasteProxy;
@@ -170,9 +172,14 @@ impl App {
         let mut list = list_column::with_capacity(count);
         for (idx, label) in self.popup_labels.iter().enumerate() {
             let active = idx == self.active_index as usize;
+            let label_text = if active {
+                text::body(label).class(theme::Text::Accent)
+            } else {
+                text::body(label)
+            };
             list = list.add(
                 list_column::button(
-                    row![text::body(label).width(Length::Fill)]
+                    row![label_text.width(Length::Fill)]
                         .align_y(Alignment::Center)
                         .width(Length::Fill),
                 )
@@ -212,14 +219,36 @@ impl App {
         self.open_popup_task(Some(self.popup_anchor()))
     }
 
+    fn scroll_popup_to_active_task(&self) -> Task<Message> {
+        if self.popup_item_count() <= POPUP_SCROLL_THRESHOLD {
+            return Task::none();
+        }
+        const ROW_STRIDE: f32 = POPUP_ROW_HEIGHT as f32 + 1.0;
+        let count = self.popup_item_count();
+        let max_y = count.saturating_sub(1) as f32 * ROW_STRIDE;
+        let y = (self.active_index as f32 * ROW_STRIDE).min(max_y);
+        scrollable::scroll_to(
+            POPUP_SCROLL_ID.clone(),
+            AbsoluteOffset {
+                x: Some(0.0),
+                y: Some(y),
+            },
+        )
+    }
+
     fn open_popup_task(&mut self, anchor: Option<PopupAnchor>) -> Task<Message> {
+        let scroll = self.scroll_popup_to_active_task();
         if let Some(id) = self.popup.take() {
             return Task::batch([
                 surface_task(destroy_popup(id)),
                 surface_task(self.open_popup_action(anchor)),
+                scroll,
             ]);
         }
-        surface_task(self.open_popup_action(anchor))
+        Task::batch([
+            surface_task(self.open_popup_action(anchor)),
+            scroll,
+        ])
     }
 
     fn open_popup_action(&self, anchor: Option<PopupAnchor>) -> cosmic::surface::Action {

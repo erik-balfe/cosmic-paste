@@ -229,20 +229,6 @@ fn spawn_show_history_watcher(show_tx: mpsc::SyncSender<()>) {
         .ok();
 }
 
-fn spawn_zbus_executor_tick(conn: zbus::Connection) {
-    thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("zbus tick runtime");
-        rt.block_on(async move {
-            loop {
-                conn.executor().tick().await;
-            }
-        });
-    });
-}
-
 async fn wait_show_history(show_rx: &Receiver<()>) {
     loop {
         match show_rx.try_recv() {
@@ -279,8 +265,26 @@ async fn run_listener(
     show_tx: &SyncSender<()>,
 ) -> Result<(), ()> {
     let conn = zbus::Connection::session().await.map_err(|_| ())?;
-    spawn_zbus_executor_tick(conn.clone());
+    let tick = tokio::spawn({
+        let conn = conn.clone();
+        async move {
+            loop {
+                conn.executor().tick().await;
+            }
+        }
+    });
 
+    let result = run_listener_connected(&conn, event_tx, show_rx, show_tx).await;
+    tick.abort();
+    result
+}
+
+async fn run_listener_connected(
+    conn: &zbus::Connection,
+    event_tx: &SyncSender<DbusEvent>,
+    show_rx: &Receiver<()>,
+    show_tx: &SyncSender<()>,
+) -> Result<(), ()> {
     let activation = AppletActivation::new(show_tx.clone());
     if !conn
         .object_server()
@@ -292,7 +296,7 @@ async fn run_listener(
     }
     let _ = conn.request_name(APPLET_BUS_NAME).await;
 
-    let proxy = CosmicPasteProxy::builder(&conn)
+    let proxy = CosmicPasteProxy::builder(conn)
         .destination(BUS_NAME)
         .map_err(|_| ())?
         .path(OBJECT_PATH)
@@ -315,7 +319,7 @@ async fn run_listener(
         .map_err(|_| ())?
         .build();
 
-    let mut stream = MessageStream::for_match_rule(rule, &conn, Some(32))
+    let mut stream = MessageStream::for_match_rule(rule, conn, Some(32))
         .await
         .map_err(|_| ())?;
 
