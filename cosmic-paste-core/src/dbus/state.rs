@@ -30,9 +30,11 @@ pub struct DaemonState {
 
 impl DaemonState {
     pub fn new_in_memory() -> Self {
-        let mut settings = Settings::default();
         // In-memory harnesses run tests in parallel in one process; skip disk I/O.
-        settings.save_history = false;
+        let settings = Settings {
+            save_history: false,
+            ..Settings::default()
+        };
         let mut state = Self {
             session: HistorySession::with_defaults(settings.history_name.clone()),
             settings,
